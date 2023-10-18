@@ -375,7 +375,7 @@ if __name__=="__main__":
 
     #set up the inputs
     input_aileron_rad = np.deg2rad(0)
-    input_elevator_rad = np.deg2rad(0)
+    input_elevator_rad = np.deg2rad(1)
     input_rudder_rad = 0
     input_thrust = 0 #newtons
 
