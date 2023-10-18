@@ -115,5 +115,4 @@ class DirectionCosineMatrix:
         return np.transpose(self.matrix)
 
 
-print("B", compute_B_matrix(0, 0, 0))
 

@@ -1,13 +1,30 @@
 import numpy as np
 import math 
+import pandas as pd
 from src.VectorOperations import euler_dcm_inertial_to_body, euler_dcm_body_to_inertial
 from src.VectorOperations import compute_B_matrix
 
-class Vector3D():
-    def __init__(self) -> None:
-        pass
+"""
+
+Resource references:
+    https://academicflight.com/articles/equations-of-motion/
+    https://aircraftflightmechanics.com/EoMs/Translation.html
+
+"""
+
 
 class Aircraft():
+    """
+    States are:
+        position: x,y,z (world frame)
+        velocity: u,v,w (body frame)
+        attitude: phi, theta, psi (world frame)
+        angular velocity: p,q,r (body frame)
+
+    Inputs are:
+        aileron, elevator, rudder, thrust
+    
+    """
     def __init__(self, aircraft_params:dict) -> None:
         self.aircraft_params =  aircraft_params
         
@@ -19,9 +36,6 @@ class Aircraft():
         
         self.attitudes = [0, 0, 0] #phi, theta, psi
         self.velocity_ef = [0, 0, 0] #x_dot, y_dot, z_dot
-
-
-
 
 class AircraftSim():
     def __init__(self, aircraft:Aircraft) -> None:
@@ -207,6 +221,7 @@ class AircraftSim():
                        input_thrust:float) -> np.ndarray:
         """
         Computes the forces in the body frame
+        returns the forces in the body frame 
         """
         # from https://academicflight.com/articles/aircraft-attitude-and-euler-angles/
         alpha_rad = self.compute_aoa()
@@ -262,20 +277,9 @@ class AircraftSim():
                  c_drag_deltae*np.sin(alpha_rad)*abs(input_elevator_rad) - \
                     c_lift_deltae*np.cos(alpha_rad)*input_elevator_rad)
             
-        #forces = np.array([ax, ay, az])
-        f_total_body = np.array([f_ax_b, f_ay_b, f_az_b])
-
-        g = 9.80665
-        gravity_earth_frame = np.array([0, 0, g])
-        gravity_body_frame = euler_dcm_inertial_to_body(self.aircraft.attitudes[0],
-                                                        self.aircraft.attitudes[1],
-                                                        self.aircraft.attitudes[2]).dot(gravity_earth_frame)
-        u = self.aircraft.velocity_bf[0]
-        v = self.aircraft.velocity_bf[1]
-        w = self.aircraft.velocity_bf[2]
-        f_total_body[0] += gravity_body_frame[0] + input_thrust - (q*w)  + (r*v)
-        f_total_body[1] += gravity_body_frame[1] - (r*u)  + (p*w)
-        f_total_body[2] += gravity_body_frame[2] - (p*v)  + (q*u)
+        f_total_body = np.array([f_ax_b+input_thrust, 
+                                 f_ay_b, 
+                                 f_az_b])
 
         return f_total_body
 
@@ -283,13 +287,44 @@ class AircraftSim():
         """
         Updates the acceleration of the aircraft in the body frame
         """
-        self.aircraft.acc_bf = forces/self.aircraft.aircraft_params['mass']
 
-    def update_velocity(self, forces:np.ndarray, delta_time:float) -> None:
+        #compute angular rates
+        p = self.aircraft.angular_velocity_bf[0]
+        q = self.aircraft.angular_velocity_bf[1]
+        r = self.aircraft.angular_velocity_bf[2]
+        u = self.aircraft.velocity_bf[0]
+        v = self.aircraft.velocity_bf[1]
+        w = self.aircraft.velocity_bf[2]
+
+        g = 9.80665
+        # gravity_earth_frame = np.array([0, 0, g])
+        # gravity_body_frame = euler_dcm_inertial_to_body(self.aircraft.attitudes[0],
+        #                                                 self.aircraft.attitudes[1],
+        #                                                 self.aircraft.attitudes[2]).dot(gravity_earth_frame)
+        gravity_body_frame = np.array([
+            g*np.sin(self.aircraft.attitudes[1]), 
+            g*np.cos(self.aircraft.attitudes[0])*np.cos(self.aircraft.attitudes[1]), 
+            g*np.cos(self.aircraft.attitudes[0])*np.cos(self.aircraft.attitudes[1])])
+
+
+        mass = self.aircraft.aircraft_params['mass']
+        self.aircraft.acc_bf[0] = (forces[0]/mass) - gravity_body_frame[0] - (q*w)  + (r*v)
+        self.aircraft.acc_bf[1] = (forces[1]/mass) + gravity_body_frame[1] - (r*u)  + (p*w)
+        self.aircraft.acc_bf[2] = (forces[2]/mass) + gravity_body_frame[2] - (p*v)  + (q*u)
+
+
+    def update_velocity(self, delta_time:float) -> None:
         """
         Updates the velocity of the aircraft in the body frame
         """
+        #make sure self.aircraft.acc_bf is a numpy array
+        self.aircraft.acc_bf = np.array(self.aircraft.acc_bf)
+
         self.aircraft.velocity_bf += self.aircraft.acc_bf*delta_time
+        # self.aircraft.velocity_bf[0] = self.aircraft.velocity_bf
+
+        #update airspeed
+        self.aircraft.airspeed = np.linalg.norm(self.aircraft.velocity_bf)
 
     def update_position(self, delta_time:float) -> None:
         """
@@ -301,8 +336,73 @@ class AircraftSim():
         self.aircraft.velocity_ef = dcm.dot(self.aircraft.velocity_bf)
         self.aircraft.position += self.aircraft.velocity_ef*delta_time
 
+def get_airplane_params(df:pd.DataFrame) -> dict:
+    airplane_params = {}
+    for index, row in df.iterrows():
+        airplane_params[row["var_name"]] = row["var_val"]
+
+    airplane_params["mass"] = 10 # kg
+    
+    return airplane_params
+
+if __name__=="__main__":
+
+    df = pd.read_csv("SIM_Plane_h_vals.csv")
+    airplane_params = get_airplane_params(df)
+    aircraft = Aircraft(airplane_params)
+
+    airspeed = 15
+    aircraft.position = np.array([0, 0, 0], dtype=float)
+    aircraft.attitudes = np.array([0, 0, 0], dtype=float)
+    aircraft.velocity_bf = np.array([airspeed, 0, 0], dtype=float)
+    aircraft.angular_velocity_bf = np.array([0, 0, 0], dtype=float)
+    aircraft.angular_acc_bf = np.array([0, 0, 0], dtype=float)
+    aircraft.velocity_ef = np.array([airspeed, 0, 0], dtype=float)
+    aircraft.airspeed = airspeed
+
+    aircraft_sim = AircraftSim(aircraft)
+
+    #set up the time
+    delta_time = 0.01
+
+    #set up the inputs
+    input_aileron_rad = np.deg2rad(0)
+    input_elevator_rad = np.deg2rad(15)
+    input_rudder_rad = 0
+    input_thrust = 200 #newtons
+
+    #begin simulation
+    n_iter = 5
+    for i in range(n_iter):
+        sim_forces = aircraft_sim.compute_forces(input_aileron_rad,
+                                                 input_elevator_rad,
+                                                 input_rudder_rad,
+                                                 input_thrust)
+
+        sim_moments = aircraft_sim.compute_moments(input_aileron_rad,
+                                                    input_elevator_rad,
+                                                    input_rudder_rad,
+                                                    sim_forces)
+        
+        aircraft_sim.update_angular_acc(sim_moments)
+        aircraft_sim.update_angular_velocity(sim_moments, delta_time)
+        aircraft_sim.update_attitude(delta_time)
+        aircraft_sim.update_acc(sim_forces)
+        aircraft_sim.update_velocity(delta_time)
+        aircraft_sim.update_position(delta_time)
+
+        # print("sim_forces: ", sim_forces)
+        print("sim_acc deg/s^2 : ", np.deg2rad(aircraft.acc_bf))
+        print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
+
+        # print("sim_moments: ", sim_moments)
+        # print("earth frame velocity: ", aircraft.velocity_ef)
+        # print("body frame velocity: ", aircraft.velocity_bf)
+        print("earth frame position: ", aircraft.position)
+        # print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
+
 
     
 
-# Update angular velocity 
+
 

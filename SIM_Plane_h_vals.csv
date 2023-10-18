@@ -41,3 +41,7 @@ deltar_max,0.3491,float,89
 CGOffset_x,-0.1,Vector3f,92
 CGOffset_y,0,Vector3f,92
 CGOffset_z,-0.05,Vector3f,92
+Ixx,2.1408,float,x
+Iyy,8.7344,float,x
+Izz,10.7211,float,x
+Ixz,0.1149,float,x
