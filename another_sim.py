@@ -3,6 +3,7 @@ import math
 import pandas as pd
 from src.VectorOperations import euler_dcm_inertial_to_body, euler_dcm_body_to_inertial
 from src.VectorOperations import compute_B_matrix
+import matplotlib.pyplot as plt
 
 """
 
@@ -33,9 +34,12 @@ class Aircraft():
         self.angular_velocity_bf = [0, 0, 0] #p,q,r
         self.angular_acc_bf = [0, 0, 0]  #p_dot, q_dot, r_dot or  l,m,n
         
-        
+        self.position = [0, 0, 0] #x,y,z
         self.attitudes = [0, 0, 0] #phi, theta, psi
         self.velocity_ef = [0, 0, 0] #x_dot, y_dot, z_dot
+
+        self.position_history = []
+        
 
 class AircraftSim():
     def __init__(self, aircraft:Aircraft) -> None:
@@ -301,9 +305,10 @@ class AircraftSim():
         # gravity_body_frame = euler_dcm_inertial_to_body(self.aircraft.attitudes[0],
         #                                                 self.aircraft.attitudes[1],
         #                                                 self.aircraft.attitudes[2]).dot(gravity_earth_frame)
+        
         gravity_body_frame = np.array([
             g*np.sin(self.aircraft.attitudes[1]), 
-            g*np.cos(self.aircraft.attitudes[0])*np.cos(self.aircraft.attitudes[1]), 
+            g*np.sin(self.aircraft.attitudes[0])*np.cos(self.aircraft.attitudes[1]), 
             g*np.cos(self.aircraft.attitudes[0])*np.cos(self.aircraft.attitudes[1])])
 
 
@@ -336,6 +341,9 @@ class AircraftSim():
         self.aircraft.velocity_ef = dcm.dot(self.aircraft.velocity_bf)
         self.aircraft.position += self.aircraft.velocity_ef*delta_time
 
+        self.aircraft.position_history.append(self.aircraft.position)
+
+
 def get_airplane_params(df:pd.DataFrame) -> dict:
     airplane_params = {}
     for index, row in df.iterrows():
@@ -351,7 +359,7 @@ if __name__=="__main__":
     airplane_params = get_airplane_params(df)
     aircraft = Aircraft(airplane_params)
 
-    airspeed = 15
+    airspeed = 30 
     aircraft.position = np.array([0, 0, 0], dtype=float)
     aircraft.attitudes = np.array([0, 0, 0], dtype=float)
     aircraft.velocity_bf = np.array([airspeed, 0, 0], dtype=float)
@@ -367,12 +375,14 @@ if __name__=="__main__":
 
     #set up the inputs
     input_aileron_rad = np.deg2rad(0)
-    input_elevator_rad = np.deg2rad(15)
+    input_elevator_rad = np.deg2rad(0)
     input_rudder_rad = 0
-    input_thrust = 200 #newtons
+    input_thrust = 0 #newtons
 
     #begin simulation
-    n_iter = 5
+    n_iter = 1000
+    position_history = []
+    attitude_history = []
     for i in range(n_iter):
         sim_forces = aircraft_sim.compute_forces(input_aileron_rad,
                                                  input_elevator_rad,
@@ -392,17 +402,70 @@ if __name__=="__main__":
         aircraft_sim.update_position(delta_time)
 
         # print("sim_forces: ", sim_forces)
-        print("sim_acc deg/s^2 : ", np.deg2rad(aircraft.acc_bf))
-        print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
-
+        # print("sim_acc deg/s^2 : ", np.deg2rad(aircraft.acc_bf))
+        # print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
         # print("sim_moments: ", sim_moments)
         # print("earth frame velocity: ", aircraft.velocity_ef)
         # print("body frame velocity: ", aircraft.velocity_bf)
         print("earth frame position: ", aircraft.position)
+        current_position = aircraft.position
+        print("current position: ", current_position)
+        position_history.append([current_position[0],
+                                 current_position[1],
+                                 current_position[2]])
+
+        attitude_history.append([aircraft.attitudes[0],
+                                aircraft.attitudes[1],
+                                aircraft.attitudes[2]])
+
         # print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
 
+    #convert to numpy array
+    x_position = []
+    y_position = []
+    z_position = []
 
+    for pos in position_history:
+        x_position.append(pos[0])
+        y_position.append(pos[1])
+        z_position.append(-pos[2])
     
+
+    roll = []
+    pitch = []
+    yaw = []
+
+    for attitude in attitude_history:
+        roll.append(np.rad2deg(attitude[0]))
+        pitch.append(np.rad2deg(attitude[1]))
+        yaw.append(np.rad2deg(attitude[2]))
+
+    #plot 3d 
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(x_position, y_position, z_position, '-o')
+    ax.scatter3D(x_position[0], 
+                 y_position[1], 
+                 -z_position[2],s=15, c='r', label='start')
+
+    ax.legend()
+    plt.show()
+
+
+    fig2 = plt.figure()
+    
+    # plot as 3 subplots
+    ax1 = fig2.add_subplot(311)
+    ax1.plot(roll, '-o')
+    
+    ax2 = fig2.add_subplot(312)
+
+    ax2.plot(pitch, '-o')
+
+    ax3 = fig2.add_subplot(313)
+    ax3.plot(yaw, '-o')
+
+    plt.show()
 
 
 
