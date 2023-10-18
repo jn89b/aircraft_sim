@@ -231,7 +231,7 @@ class AircraftDynamics():
         ma += -CGOffset.x * force.z + CGOffset.z * force.x
         na += -CGOffset.y * force.x + CGOffset.x * force.y
 
-        return Vector3D(la, 0, na)
+        return Vector3D(la, ma, na)
 
     def compute_forces(self, inputs:dict) -> Vector3D:
         """
