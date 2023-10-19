@@ -25,20 +25,27 @@ https://www.youtube.com/watch?v=SOM98EpErT8&list=PLIwDIOqR-ET0kKguPqG-2CBQyZdG7C
 - Test with opti stack framework first then add complexity 
 - Compute waypoints 
 - From waypoints 
-- compute attitude desired 
-- set position desired 
+  - compute attitude desired 
+  - set position desired 
+
+MPC FORMULATION
 - Set states as :
   - x y z
-  - u v w
-  - phi theta psi
-  - p q r 
+  - u v w # body frame rate
+  - phi theta psi # 
+  - p q r #body frame rates 
+
+- Rotate and integrate 
+
 - Set controls as:
   - Throttle
   - daileron 
   - delevator
   - drudder
+
 - Set constraints for controls:
   - Max angle flaps
+
 - Set constraints for states:
   - u v w
   - phi theta psi

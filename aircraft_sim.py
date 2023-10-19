@@ -691,9 +691,9 @@ class AircraftSim():
         self.update_acc(sim_forces)
         self.update_velocity(delta_time)
         self.update_position(delta_time)
+    
 
-
-
+# Use as utility function
 def get_airplane_params(df:pd.DataFrame) -> dict:
     airplane_params = {}
     for index, row in df.iterrows():
