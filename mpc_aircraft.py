@@ -84,9 +84,9 @@ class AircraftCasadi():
 
 
     def define_states(self):
-        # self.x = ca.MX.sym('x') # North position
-        # self.y = ca.MX.sym('y') # East position
-        # self.z = ca.MX.sym('z')
+        self.x = ca.MX.sym('x') # North position
+        self.y = ca.MX.sym('y') # East position
+        self.z = ca.MX.sym('z')
 
         self.u = ca.MX.sym('u') # Velocity along body x-axis
         self.v = ca.MX.sym('v')
@@ -101,7 +101,7 @@ class AircraftCasadi():
         self.r = ca.MX.sym('r')
 
         self.states = ca.vertcat(
-            # self.x, self.y, self.z, 
+            self.x, self.y, self.z, 
             self.u, self.v, self.w, 
             self.phi, self.theta, self.psi, 
             self.p, self.q, self.r)
@@ -155,18 +155,34 @@ class AircraftCasadi():
         M = coefficient["mcoeff"]
         c_lift_0 = coefficient["c_lift_0"]
         c_lift_a0 = coefficient["c_lift_a"]
-        alpha = alpha0
+        alpha = ca_alpha
 
-        sigmoid = (1 + np.exp(-M * (alpha - alpha0)) + \
-                   np.exp(M * (alpha + alpha0))) / (1 + math.exp(-M * (alpha - alpha0))) \
-                    / (1 + math.exp(M * (alpha + alpha0)))
+        alpha_diff = alpha - alpha0
+        max_alpha_delta = 0.8
+        alpha = ca.if_else(alpha_diff > max_alpha_delta, 
+                                alpha0+max_alpha_delta, 
+                                alpha)
+        
+        other_way = alpha0 - alpha
+        alpha = ca.if_else(other_way > max_alpha_delta,
+                                alpha0-max_alpha_delta,
+                                alpha)
+        
+        #use casadi to compute the sigmoid function
+        sigmoid = (1 + ca.exp(-M * (alpha - alpha0)) + \
+                     ca.exp(M * (alpha + alpha0))) / (1 + ca.exp(-M * (alpha - alpha0))) \
+                        / (1 + ca.exp(M * (alpha + alpha0)))
+        
+
         linear = (1.0 - sigmoid) * (c_lift_0 + c_lift_a0 * alpha)  # Lift at small AoA
-        flat_plate = sigmoid * (2 * math.copysign(1, alpha) * math.pow(math.sin(alpha), 2) * math.cos(alpha))  # Lift beyond stall
+
+        #use casadi to compute the flat plate function
+        flat_plate = sigmoid * (2 * ca.sign(alpha) * ca.sin(alpha)**2 * ca.cos(alpha))
 
         result = linear + flat_plate
         
-        return c_lift_0 + c_lift_a0 * ca_alpha
-        # return result
+        # return c_lift_0 + c_lift_a0 * ca_alpha
+        return result
     
     def compute_moments(self) -> ca.MX:
         alpha = self.compute_aoa()
@@ -377,18 +393,33 @@ class AircraftCasadi():
                     (self.r * ca.cos(self.phi) * (1 / ca.cos(self.theta)))
 
         self.u_dot = (sim_forces[0] / mass) - \
-            (g * ca.sin(self.theta)) #+ (self.r * self.v) - (self.q * self.w)
+            (g * ca.sin(self.theta)) + (self.r * self.v) - (self.q * self.w)
         
         self.v_dot = (sim_forces[1] / mass) + \
-            (g * ca.sin(self.phi) * ca.cos(self.theta)) #- (self.r * self.u) + (self.p * self.w)
+            (g * ca.sin(self.phi) * ca.cos(self.theta)) - (self.r * self.u) + (self.p * self.w)
         
         self.w_dot = (sim_forces[2] / mass) + \
-            (g * ca.cos(self.phi) * ca.cos(self.theta)) #- (self.p * self.v) + (self.q * self.u)
+            (g * ca.cos(self.phi) * ca.cos(self.theta)) - (self.p * self.v) + (self.q * self.u)
         
         
-
+        self.x_dot = self.u * ca.cos(self.theta) * ca.cos(self.psi) + \
+            self.v * (ca.sin(self.phi) * ca.sin(self.theta) * ca.cos(self.psi) - \
+            ca.cos(self.phi) * ca.sin(self.psi)) + \
+            self.w * (ca.cos(self.phi) * ca.sin(self.theta) * ca.cos(self.psi) + \
+            ca.sin(self.phi) * ca.sin(self.psi))
+        
+        self.y_dot = self.u * ca.cos(self.theta) * ca.sin(self.psi) + \
+            self.v * (ca.sin(self.phi) * ca.sin(self.theta) * ca.sin(self.psi) + \
+            ca.cos(self.phi) * ca.cos(self.psi)) + \
+            self.w * (ca.cos(self.phi) * ca.sin(self.theta) * ca.sin(self.psi) - \
+            ca.sin(self.phi) * ca.cos(self.psi))
+        
+        self.z_dot = -self.u * ca.sin(self.theta) + \
+            self.v * ca.sin(self.phi) * ca.cos(self.theta) + \
+            self.w * ca.cos(self.phi) * ca.cos(self.theta)
+            
         self.z_dot = ca.vertcat(
-            # self.x_dot, self.y_dot, self.z_dot, 
+            self.x_dot, self.y_dot, self.z_dot, 
             self.u_dot, self.v_dot, self.w_dot, 
             self.phi_dot, self.theta_dot, self.psi_dot, 
             self.p_dot, self.q_dot, self.r_dot)
@@ -431,10 +462,10 @@ if __name__=="__main__":
     init_q = 0
     init_r = 0
 
-    init_el = 0
-    init_al = 0
+    init_el = np.deg2rad(5)
+    init_al = np.deg2rad(0)
     init_rud = 0
-    init_throttle = 0
+    init_throttle = 100
 
 
     goal_x = 10
@@ -444,7 +475,7 @@ if __name__=="__main__":
 
     #test the force function
     states = np.array([
-        #init_x, init_y, init_z,
+        init_x, init_y, init_z,
         init_u, init_v, init_w,
         init_phi, init_theta, init_psi,
         init_p, init_q, init_r
@@ -457,8 +488,8 @@ if __name__=="__main__":
 
     # Optimal control problem
     opti = ca.Opti()
-    dt = 0.01 # Time step
-    N = 10
+    dt = 0.1 # Time step
+    N = 20
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem
@@ -472,7 +503,7 @@ if __name__=="__main__":
 
     # set initial value
     opti.set_value(x0, np.array([
-                                 #init_x, init_y, init_z, 
+                                 init_x, init_y, init_z, 
                                  init_u, init_v, init_w, 
                                  init_phi, init_theta, init_psi, 
                                  init_p, init_q, init_r]))
@@ -507,6 +538,7 @@ if __name__=="__main__":
         # controls = U[:,k]
         # state_next = X[:,k+1]
         opti.subject_to(U[:,k]==u0) # Use initial control input
+        U[:,k] = u0
 
         k1 = f(X[:,k], U[:,k])
         k2 = f(X[:,k] + dt/2 * k1, U[:,k])
@@ -571,12 +603,38 @@ if __name__=="__main__":
     # plot position in 3D
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot(sol.value(X[0,:]), sol.value(X[1,:]), sol.value(X[2,:]) , '-o')
+    ax.plot(sol.value(X[0,:]), sol.value(X[1,:]), -sol.value(X[2,:]) , '-o')
     ax.set_xlabel('x [m]')
     ax.set_ylabel('y [m]')
     ax.set_zlabel('z [m]')
 
-    plt.show()
+    #plot starting and ending points
+    ax.scatter(sol.value(X[0,0]), sol.value(X[1,0]), 
+               sol.value(X[2,0]), c='r', marker='o', label='start')
+    ax.scatter(sol.value(X[0,-1]), sol.value(X[1,-1]), 
+               -sol.value(X[2,-1]), c='g', marker='o', label='end')
 
+    #set axis equal
+    max_range = np.array([sol.value(X[0,:]).max()-sol.value(X[0,:]).min(), sol.value(X[1,:]).max()-sol.value(X[1,:]).min(), sol.value(X[2,:]).max()-sol.value(X[2,:]).min()]).max() / 2.0
+    mean_x = sol.value(X[0,:]).mean()
+    mean_y = sol.value(X[1,:]).mean()
+    mean_z = sol.value(X[2,:]).mean()
+    ax.set_xlim(mean_x - max_range, mean_x + max_range)
+    ax.set_ylim(mean_y - max_range, mean_y + max_range)
+    ax.set_zlim(mean_z - max_range, mean_z + max_range)
+    ax.legend()
+
+    #plot control inputs in subplots
+    fig, axs = plt.subplots(4,1)
+    axs[0].plot(sol.value(U[0,:]))
+    axs[0].set_ylabel('Elevator [rad]')
+    axs[1].plot(sol.value(U[1,:]))
+    axs[1].set_ylabel('Aileron [rad]')
+    axs[2].plot(sol.value(U[2,:]))
+    axs[2].set_ylabel('Rudder [rad]')
+    axs[3].plot(sol.value(U[3,:]))
+    axs[3].set_ylabel('Throttle [N]')
+
+    plt.show()
 
 

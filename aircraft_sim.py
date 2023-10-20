@@ -403,7 +403,7 @@ class AircraftSim():
         v = approx_states['velocity_bf'][1]
         w = approx_states['velocity_bf'][2]
 
-        g = 9.80665
+        g = 9.81
         gravity_body_frame = np.array([
             g*np.sin(projected_states['attitudes'][1]), 
             g*np.sin(projected_states['attitudes'][0])*np.cos(projected_states['attitudes'][1]), 
@@ -429,7 +429,7 @@ class AircraftSim():
         v = self.aircraft.velocity_bf[1]
         w = self.aircraft.velocity_bf[2]
 
-        g = 9.80665
+        g = 9.81
         gravity_body_frame = np.array([
             g*np.sin(self.aircraft.attitudes[1]), 
             g*np.sin(self.aircraft.attitudes[0])*np.cos(self.aircraft.attitudes[1]), 
