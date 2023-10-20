@@ -15,23 +15,23 @@ def ca_euler_dcm_inertial_to_body(ca_phi_rad:ca.MX,
     pitch = ca_theta_rad
     yaw = ca_psi_rad
 
-    # Create rotation matrices for each axis
-    R_roll = ca.vertcat(ca.horzcat(1, 0, 0),
-                        ca.horzcat(0, ca.cos(roll), -ca.sin(roll)),
-                        ca.horzcat(0, ca.sin(roll), ca.cos(roll)))
+    cos_phi = ca.cos(roll)
+    sin_phi = ca.sin(roll)
+    cos_theta = ca.cos(pitch)
+    sin_theta = ca.sin(pitch)
+    cos_psi = ca.cos(yaw)
+    sin_psi = ca.sin(yaw)
 
-    R_pitch = ca.vertcat(ca.horzcat(ca.cos(pitch), 0, ca.sin(pitch)),
-                        ca.horzcat(0, 1, 0),
-                        ca.horzcat(-ca.sin(pitch), 0, ca.cos(pitch)))
-
-    R_yaw = ca.vertcat(ca.horzcat(ca.cos(yaw), -ca.sin(yaw), 0),
-                    ca.horzcat(ca.sin(yaw), ca.cos(yaw), 0),
-                    ca.horzcat(0, 0, 1))
-
-    # Compute the total rotation matrix (DCM) by multiplying individual matrices
-    dcm = R_yaw @ R_pitch @ R_roll
+    dcm = ca.vertcat(
+        ca.horzcat(cos_theta * cos_psi, cos_theta * sin_psi, -sin_theta),
+        ca.horzcat(sin_phi * sin_theta * cos_psi - cos_phi * sin_psi, 
+                    sin_phi * sin_theta * sin_psi + cos_phi * cos_psi, 
+                    sin_phi * cos_theta),
+        ca.horzcat(cos_phi * sin_theta * cos_psi + sin_phi * sin_psi, 
+                    cos_phi * sin_theta * sin_psi - sin_phi * cos_psi, 
+                    cos_phi * cos_theta)
+    )
     
-
     return dcm
 
 
@@ -115,21 +115,24 @@ class AircraftCasadi():
         self.delta_t = ca.MX.sym('delta_t') # Throttle
 
         self.controls = ca.vertcat(
-            self.delta_a, self.delta_e, self.delta_r, self.delta_t)
+            self.delta_a, 
+            self.delta_e, 
+            self.delta_r, 
+            self.delta_t)
         
         self.num_controls = self.controls.size()[0]
 
     def compute_aoa(self) -> ca.MX:
         # Compute the angle of attack
         # check divide by zero
-        alpha = ca.if_else(self.u < 1e-2, 0, ca.atan2(self.w, self.u))
+        alpha = ca.if_else(self.u < 1e-2, 0.0 , ca.atan2(self.w, self.u))
         return alpha
 
     def compute_beta(self) -> ca.MX:
         # Compute the sideslip angle
         # check divide by zero
 
-        beta = ca.if_else(self.u < 1e-2, 0, ca.atan2(self.v, self.u))
+        beta = ca.if_else(self.u < 1e-2, 0.0, ca.atan2(self.v, self.u))
         # return ca.atan2(self.v, self.u)
         return beta
 
@@ -150,6 +153,9 @@ class AircraftCasadi():
     
 
     def lift_coeff(self, ca_alpha)-> ca.MX:
+        """
+        Computes the lift coefficient of the aircraft
+        """
         coefficient = self.aircraft_params
         alpha0 = coefficient["alpha_stall"]
         M = coefficient["mcoeff"]
@@ -178,11 +184,8 @@ class AircraftCasadi():
 
         #use casadi to compute the flat plate function
         flat_plate = sigmoid * (2 * ca.sign(alpha) * ca.sin(alpha)**2 * ca.cos(alpha))
-
-        result = linear + flat_plate
-        
-        # return c_lift_0 + c_lift_a0 * ca_alpha
-        return result
+    
+        return linear + flat_plate
     
     def compute_moments(self) -> ca.MX:
         alpha = self.compute_aoa()
@@ -241,9 +244,16 @@ class AircraftCasadi():
                     c_n_deltaa * input_aileron +
                     c_n_deltar * input_rudder)
         
-        la = ca.if_else(airspeed < 1e-2, 0, la)
-        ma = ca.if_else(airspeed < 1e-2, 0, ma)
-        na = ca.if_else(airspeed < 1e-2, 0, na)
+
+        la = ca.if_else(airspeed == 0, 0, la)
+        ma = ca.if_else(airspeed == 0, 0, ma)
+        na = ca.if_else(airspeed == 0, 0, na)
+
+        #add offset to moments
+        force = self.force_function(self.states, self.controls)
+        la += CGOffset[1] * force[2] - CGOffset[2] * force[1]
+        ma += -CGOffset[0] * force[2] + CGOffset[2] * force[0]
+        na += -CGOffset[1] * force[0] + CGOffset[0] * force[1]
 
         moments = ca.vertcat(la, ma, na)
 
@@ -307,14 +317,13 @@ class AircraftCasadi():
                 c_lift_deltae*np.cos(alpha)*delta_e)
 
         # Set forces to zero when airspeed is zero
-        f_ax_b = ca.if_else(airspeed < 1e-2, 0.0, f_ax_b)
-        f_ay_b = ca.if_else(airspeed < 1e-2, 0.0, f_ay_b)
-        f_az_b = ca.if_else(airspeed < 1e-2, 0.0, f_az_b)
+        f_ax_b = ca.if_else(airspeed <= 1e-2, 0.0, f_ax_b)
+        f_ay_b = ca.if_else(airspeed <= 1e-2, 0.0, f_ay_b)
+        f_az_b = ca.if_else(airspeed <= 1e-2, 0.0, f_az_b)
 
         # Define the total force in the body frame
         f_total_body = ca.vertcat(f_ax_b + delta_t, f_ay_b, f_az_b)                    
         
-        # f_total_body[1] = 10
 
         self.force_function = ca.Function('compute_forces', 
                                         [self.states, self.controls], 
@@ -343,30 +352,9 @@ class AircraftCasadi():
         return ca.vertcat(p_dot, q_dot, r_dot)
         
     def set_state_space(self) -> ca.Function:
-        # Define the state-space equations
-        # forces = self.force_function(self.states, self.controls)
-        # moments = self.compute_moments() #returns la, ma, na
 
-        # forces[0] = 0
-        # forces[1] = 0
-        # forces[2] = 0
-
-        # moments[0] = 0
-        # moments[1] = 0
-        # moments[2] = 0
-        #initialize moment as a MX 3 x 1 vector
-        # moments = ca.MX.sym('moments', 3, 1)
-        # forces = ca.MX.sym('forces', 3, 1) 
         moments = self.moment_function(self.states, self.controls)
         sim_forces = self.force_function(self.states, self.controls)
-
-        # moments = ca.vertcat(
-        #     100, 100, 100
-        # )
-        # sim_forces = ca.vertcat(
-        #     100, 100, 100
-        # )
-
 
         Ixx = self.aircraft_params["Ixx"]
         Iyy = self.aircraft_params["Iyy"]
@@ -396,29 +384,41 @@ class AircraftCasadi():
             (g * ca.sin(self.theta)) + (self.r * self.v) - (self.q * self.w)
         
         self.v_dot = (sim_forces[1] / mass) + \
-            (g * ca.sin(self.phi) * ca.cos(self.theta)) - (self.r * self.u) + (self.p * self.w)
+            (g * ca.sin(self.phi) * ca.cos(self.theta)) - \
+                  (self.r * self.u) + (self.p * self.w)
         
         self.w_dot = (sim_forces[2] / mass) + \
-            (g * ca.cos(self.phi) * ca.cos(self.theta)) - (self.p * self.v) + (self.q * self.u)
+            (g * ca.cos(self.phi) * ca.cos(self.theta)) - \
+                (self.p * self.v) + (self.q * self.u)
         
         
-        self.x_dot = self.u * ca.cos(self.theta) * ca.cos(self.psi) + \
-            self.v * (ca.sin(self.phi) * ca.sin(self.theta) * ca.cos(self.psi) - \
-            ca.cos(self.phi) * ca.sin(self.psi)) + \
-            self.w * (ca.cos(self.phi) * ca.sin(self.theta) * ca.cos(self.psi) + \
-            ca.sin(self.phi) * ca.sin(self.psi))
+        # #get x, y, z in inertial frame
+        dcm_body_to_inertial = ca_euler_dcm_body_to_inertial(
+            self.phi, self.theta, self.psi)
+        body_vel = ca.vertcat(self.u, self.v, self.w)
+        inertial_vel = ca.mtimes(dcm_body_to_inertial, body_vel)
+         
+        self.x_dot = inertial_vel[0]
+        self.y_dot = inertial_vel[1]
+        self.z_dot = inertial_vel[2]
+
+        # self.x_dot = self.u * ca.cos(self.theta) * ca.cos(self.psi) + \
+        #     self.v * (ca.sin(self.phi) * ca.sin(self.theta) * ca.cos(self.psi) - \
+        #     ca.cos(self.phi) * ca.sin(self.psi)) + \
+        #     self.w * (ca.cos(self.phi) * ca.sin(self.theta) * ca.cos(self.psi) + \
+        #     ca.sin(self.phi) * ca.sin(self.psi))
         
-        self.y_dot = self.u * ca.cos(self.theta) * ca.sin(self.psi) + \
-            self.v * (ca.sin(self.phi) * ca.sin(self.theta) * ca.sin(self.psi) + \
-            ca.cos(self.phi) * ca.cos(self.psi)) + \
-            self.w * (ca.cos(self.phi) * ca.sin(self.theta) * ca.sin(self.psi) - \
-            ca.sin(self.phi) * ca.cos(self.psi))
+        # self.y_dot = self.u * ca.cos(self.theta) * ca.sin(self.psi) + \
+        #     self.v * (ca.sin(self.phi) * ca.sin(self.theta) * ca.sin(self.psi) + \
+        #     ca.cos(self.phi) * ca.cos(self.psi)) + \
+        #     self.w * (ca.cos(self.phi) * ca.sin(self.theta) * ca.sin(self.psi) - \
+        #     ca.sin(self.phi) * ca.cos(self.psi))
         
-        self.z_dot = -self.u * ca.sin(self.theta) + \
-            self.v * ca.sin(self.phi) * ca.cos(self.theta) + \
-            self.w * ca.cos(self.phi) * ca.cos(self.theta)
+        # self.z_dot = -self.u * ca.sin(self.theta) + \
+        #     self.v * ca.sin(self.phi) * ca.cos(self.theta) + \
+        #     self.w * ca.cos(self.phi) * ca.cos(self.theta)
             
-        self.z_dot = ca.vertcat(
+        self.states_dot = ca.vertcat(
             self.x_dot, self.y_dot, self.z_dot, 
             self.u_dot, self.v_dot, self.w_dot, 
             self.phi_dot, self.theta_dot, self.psi_dot, 
@@ -427,7 +427,7 @@ class AircraftCasadi():
 
         #right hand side of the state space equation
         self.f = ca.Function('f', [self.states, self.controls], 
-                                [self.z_dot])
+                                [self.states_dot])
     
         return self.f 
     
@@ -462,10 +462,10 @@ if __name__=="__main__":
     init_q = 0
     init_r = 0
 
-    init_el = np.deg2rad(0)
+    init_el = np.deg2rad(1)
     init_al = np.deg2rad(0)
     init_rud = 0
-    init_throttle = 0
+    init_throttle = 200
 
 
     goal_x = 10
@@ -479,16 +479,16 @@ if __name__=="__main__":
         init_phi, init_theta, init_psi,
         init_p, init_q, init_r
     ])
-    controls = np.array([init_el, init_al, init_rud, init_throttle])
+    controls = np.array([init_al, init_el, init_rud, init_throttle])
 
     forces = aircraft.compute_forces()
-    # print("force function", aircraft.force_function(states, controls))
-    # print("moment function", aircraft.moment_function(states, controls))
+    print("force function", aircraft.force_function(states, controls))
+    print("moment function", aircraft.moment_function(states, controls))
 
     # Optimal control problem
     opti = ca.Opti()
     dt = 0.01 # Time step
-    N = 200
+    N = 100 
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem
@@ -518,7 +518,9 @@ if __name__=="__main__":
     opti.subject_to(X[:,0] == x0)
     # opti.subject_to(X[:,-1] == xF)
     opti.subject_to(U[:,0] == u0)
-    
+
+    #let terminal constraints be free
+
 
     # set constraints to dynamics
     #set states to a numerical integration of the dynamics
@@ -535,22 +537,22 @@ if __name__=="__main__":
     for k in range(N):
         
         # opti.subject_to(U[:,k]==u0) # Use initial control input
-        # U[:,k] = u0
+        U[:,k] = u0
         # U[0,k] = 0
         # U[1,k] = 0
         # U[2,k] = 0
         # U[3,k] = 0
 
-        k1 = f(X[:,k], U[:,k])
-        k2 = f(X[:,k] + dt/2 * k1, U[:,k])
-        k3 = f(X[:,k] + dt/2 * k2, U[:,k])
-        k4 = f(X[:,k] + dt * k3, U[:,k])
-        x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-        opti.subject_to(X[:,k+1]==x_next) # Use initial state
+        # k1 = f(X[:,k], U[:,k])
+        # k2 = f(X[:,k] + dt/2 * k1, U[:,k])
+        # k3 = f(X[:,k] + dt/2 * k2, U[:,k])
+        # k4 = f(X[:,k] + dt * k3, U[:,k])
+        # x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+        # opti.subject_to(X[:,k+1]==x_next) # Use initial state
 
 
         # use eulers
-        #opti.subject_to(X[:,k+1] == X[:,k] + dt * f(X[:,k], U[:,k]))
+        opti.subject_to(X[:,k+1] == X[:,k] + (dt * f(X[:,k], U[:,k])))
 
     # set constraints to control inputs
     max_control_surface = np.deg2rad(25)
@@ -603,7 +605,7 @@ if __name__=="__main__":
 
     #plot starting and ending points
     ax.scatter(sol.value(X[0,0]), sol.value(X[1,0]), 
-               sol.value(X[2,0]), c='r', marker='o', label='start')
+               -sol.value(X[2,0]), c='r', marker='o', label='start')
     ax.scatter(sol.value(X[0,-1]), sol.value(X[1,-1]), 
                -sol.value(X[2,-1]), c='g', marker='o', label='end')
 
@@ -618,16 +620,29 @@ if __name__=="__main__":
     # ax.set_zlim(mean_z - max_z_range, mean_z + 30)
     ax.legend()
 
+    t_vec = np.linspace(t_init, t_init + N*dt, N)
     #plot control inputs in subplots
     fig, axs = plt.subplots(4,1)
-    axs[0].plot(sol.value(U[0,:]))
-    axs[0].set_ylabel('Aileron [rad]')
-    axs[1].plot(sol.value(U[1,:]))
-    axs[1].set_ylabel('Elevator [rad]')
-    axs[2].plot(sol.value(U[2,:]))
-    axs[2].set_ylabel('Rudder [rad]')
-    axs[3].plot(sol.value(U[3,:]))
+    axs[0].plot(t_vec, np.rad2deg(sol.value(U[0,:])))
+    axs[0].set_ylabel('Aileron [deg]')
+    axs[1].plot(t_vec, np.rad2deg(sol.value(U[1,:])))
+    axs[1].set_ylabel('Elevator [deg]')
+    axs[2].plot(t_vec, np.rad2deg(sol.value(U[2,:])))
+    axs[2].set_ylabel('Rudder [deg]')
+    axs[3].plot(t_vec,sol.value(U[3,:]))
     axs[3].set_ylabel('Throttle [N]')
+
+    # plot the attitudes
+    t_vec = np.linspace(t_init, t_init + N*dt, N+1)
+    fig, axs = plt.subplots(3,1)
+    axs[0].plot(t_vec, np.rad2deg(sol.value(X[6,:])))
+    axs[0].set_ylabel('Roll [deg]')
+    axs[1].plot(t_vec, np.rad2deg(sol.value(X[7,:])))
+    axs[1].set_ylabel('Pitch [deg]')
+    axs[2].plot(t_vec, np.rad2deg(sol.value(X[8,:])))
+    axs[2].set_ylabel('Yaw [deg]')
+    axs[2].set_xlabel('Time [s]')
+
 
     plt.show()
 

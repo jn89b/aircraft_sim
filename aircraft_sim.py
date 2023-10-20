@@ -148,8 +148,6 @@ class AircraftSim():
         #     alpha *= max(0, min(1, 1 - input_thrust))
 
         rho = 1.225 # kg/m^3
-
-
         qbar = 1.0 / 2.0 * rho * pow(effective_airspeed, 2) * s
 
         if effective_airspeed == 0:
@@ -727,15 +725,31 @@ if __name__=="__main__":
 
     #set up the inputs
     input_aileron_rad = np.deg2rad(0)
-    input_elevator_rad = np.deg2rad(0)
+    input_elevator_rad = np.deg2rad(1)
     input_rudder_rad = 0
-    input_thrust = 0 #newtons
+    input_thrust = 200 #newtons
 
     #begin simulation
-    n_iter = 200
+    n_iter = 100
     position_history = []
     attitude_history = []
     
+
+    #compute forces 
+    sim_forces = aircraft_sim.compute_forces(input_aileron_rad,
+                                                input_elevator_rad,
+                                                input_rudder_rad,
+                                                input_thrust)
+    
+    #compute moments
+    sim_moments = aircraft_sim.compute_moments(input_aileron_rad,
+                                                input_elevator_rad,
+                                                input_rudder_rad,
+                                                sim_forces)
+    
+    print("sim_forces: ", sim_forces)
+    print("sim_moments: ", sim_moments)
+
     for i in range(n_iter):
 
         # aircraft_sim.sim_rk4(input_aileron_rad,
@@ -752,12 +766,12 @@ if __name__=="__main__":
         
         # print("sim_forces: ", sim_forces)
         # print("sim_acc deg/s^2 : ", np.deg2rad(aircraft.acc_bf))
-        print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
+        # print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
         # print("sim_moments: ", sim_moments)
         # print("earth frame velocity: ", aircraft.velocity_ef)
         # print("body frame velocity: ", aircraft.velocity_bf)
         current_position = aircraft.position
-        print("current position: ", current_position)
+        #print("current position: ", current_position)
         position_history.append([current_position[0],
                                  current_position[1],
                                  current_position[2]])
@@ -797,19 +811,14 @@ if __name__=="__main__":
                  -z_position[2],s=15, c='r', label='start')
 
     ax.legend()
-    plt.show()
-
 
     fig2 = plt.figure()
     
     # plot as 3 subplots
     ax1 = fig2.add_subplot(311)
-    ax1.plot(roll, '-o')
-    
+    ax1.plot(roll, '-o')    
     ax2 = fig2.add_subplot(312)
-
     ax2.plot(pitch, '-o')
-
     ax3 = fig2.add_subplot(313)
     ax3.plot(yaw, '-o')
 
