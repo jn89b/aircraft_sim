@@ -121,11 +121,17 @@ class AircraftCasadi():
 
     def compute_aoa(self) -> ca.MX:
         # Compute the angle of attack
-        return ca.atan2(self.w, self.u)
+        # check divide by zero
+        alpha = ca.if_else(self.u < 1e-2, 0, ca.atan2(self.w, self.u))
+        return alpha
 
     def compute_beta(self) -> ca.MX:
         # Compute the sideslip angle
-        return ca.atan2(self.v, self.u)
+        # check divide by zero
+
+        beta = ca.if_else(self.u < 1e-2, 0, ca.atan2(self.v, self.u))
+        # return ca.atan2(self.v, self.u)
+        return beta
 
     def drag_coeff(self, ca_alpha)-> ca.MX:
         # Compute the drag coefficient
@@ -271,25 +277,18 @@ class AircraftCasadi():
         c_z_a = -c_drag_a*ca.sin(alpha) - c_lift_a*ca.cos(alpha)
         c_z_q = -c_drag_q*ca.sin(alpha) - c_lift_q*ca.cos(alpha)
 
-        #check if airspeed is 0
-        # threshold = 1e-2
-        # is_airspeed_less_than = airspeed < threshold
 
-        # check_airspeed_fn = ca.Function('check_airspeed_fn', 
-        #                                 [airspeed], [is_airspeed_less_than])
-
-        # if check_airspeed_fn(airspeed):
-        #     f_ax_b = 0
-        #     f_ay_b = 0
-        #     f_az_b = 0
-        # else:
-        # Define the equations
-        f_ax_b = qbar * (c_x_a + c_x_q * c*q / (2 * airspeed) - c_drag_deltae * ca.cos(alpha) * ca.fabs(self.delta_e) +
+        f_ax_b = qbar * (c_x_a + c_x_q * c*q / (2 * airspeed) - \
+                         c_drag_deltae * ca.cos(alpha) * delta_e +
                         c_lift_deltae * ca.sin(alpha) * delta_e)
-        f_ay_b = qbar * (c_y_0 + c_y_b * beta + c_y_p * b * p / (2 * airspeed) + c_y_r * b * r / (2 * airspeed) +
+        
+        f_ay_b = qbar * (c_y_0 + c_y_b * beta + c_y_p * b * p / (2 * airspeed) + \
+                         c_y_r * b * r / (2 * airspeed) +
                         c_y_deltaa * delta_a + c_y_deltar * delta_r)
-        f_az_b = qbar * (c_z_a + c_z_q * c*q / (2 * airspeed) - c_drag_deltae * ca.sin(alpha) * ca.fabs(self.delta_e) -
-                        c_lift_deltae * ca.cos(alpha) * delta_e)
+        
+        f_az_b = qbar*(c_z_a + c_z_q*c*q/(2*airspeed) - \
+                c_drag_deltae*np.sin(alpha)*ca.fabs(delta_e) - \
+                c_lift_deltae*np.cos(alpha)*delta_e)
 
         # Set forces to zero when airspeed is zero
         f_ax_b = ca.if_else(airspeed < 1e-2, 0.0, f_ax_b)
@@ -299,6 +298,8 @@ class AircraftCasadi():
         # Define the total force in the body frame
         f_total_body = ca.vertcat(f_ax_b + delta_t, f_ay_b, f_az_b)                    
         
+        # f_total_body[1] = 10
+
         self.force_function = ca.Function('compute_forces', 
                                         [self.states, self.controls], 
                                         [f_total_body],
@@ -341,12 +342,12 @@ class AircraftCasadi():
         # moments = ca.MX.sym('moments', 3, 1)
         # forces = ca.MX.sym('forces', 3, 1) 
         moments = self.moment_function(self.states, self.controls)
-        forces = self.force_function(self.states, self.controls)
+        sim_forces = self.force_function(self.states, self.controls)
 
         # moments = ca.vertcat(
         #     100, 100, 100
         # )
-        # forces = ca.vertcat(
+        # sim_forces = ca.vertcat(
         #     100, 100, 100
         # )
 
@@ -375,26 +376,23 @@ class AircraftCasadi():
         self.psi_dot = (self.q * ca.sin(self.phi) * (1 / ca.cos(self.theta))) + \
                     (self.r * ca.cos(self.phi) * (1 / ca.cos(self.theta)))
 
-        self.u_dot = (forces[0] / mass) - \
-            (g * ca.sin(self.theta)) + (self.r * self.v) - (self.q * self.w)
+        self.u_dot = (sim_forces[0] / mass) - \
+            (g * ca.sin(self.theta)) #+ (self.r * self.v) - (self.q * self.w)
         
-        self.v_dot = (forces[1] / mass) + \
-            (g * ca.sin(self.phi) * ca.cos(self.theta)) - (self.r * self.u) + (self.p * self.w)
+        self.v_dot = (sim_forces[1] / mass) + \
+            (g * ca.sin(self.phi) * ca.cos(self.theta)) #- (self.r * self.u) + (self.p * self.w)
         
-        self.w_dot = (forces[2] / mass) + \
-            (g * ca.cos(self.phi) * ca.cos(self.theta)) - (self.p * self.v) + (self.q * self.u)
+        self.w_dot = (sim_forces[2] / mass) + \
+            (g * ca.cos(self.phi) * ca.cos(self.theta)) #- (self.p * self.v) + (self.q * self.u)
         
+        
+
         self.z_dot = ca.vertcat(
-            #self.x_dot, self.y_dot, self.z_dot, 
+            # self.x_dot, self.y_dot, self.z_dot, 
             self.u_dot, self.v_dot, self.w_dot, 
             self.phi_dot, self.theta_dot, self.psi_dot, 
             self.p_dot, self.q_dot, self.r_dot)
         
-
-        self.z_dot = ca.vertcat(
-            forces[0], forces[1], forces[2],
-            moments[0], moments[1], moments[2],
-            self.p_dot, self.q_dot, self.r_dot)
 
         #right hand side of the state space equation
         self.f = ca.Function('f', [self.states, self.controls], 
@@ -460,7 +458,7 @@ if __name__=="__main__":
     # Optimal control problem
     opti = ca.Opti()
     dt = 0.01 # Time step
-    N = 30
+    N = 10
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem
