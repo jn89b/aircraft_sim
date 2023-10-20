@@ -109,13 +109,13 @@ class AircraftCasadi():
         self.num_states = self.states.size()[0]
 
     def define_controls(self):
-        self.delta_e = ca.MX.sym('delta_e') # Elevator
         self.delta_a = ca.MX.sym('delta_a') # Aileron
+        self.delta_e = ca.MX.sym('delta_e') # Elevator
         self.delta_r = ca.MX.sym('delta_r') # Rudder
         self.delta_t = ca.MX.sym('delta_t') # Throttle
 
         self.controls = ca.vertcat(
-            self.delta_e, self.delta_a, self.delta_r, self.delta_t)
+            self.delta_a, self.delta_e, self.delta_r, self.delta_t)
         
         self.num_controls = self.controls.size()[0]
 
@@ -462,16 +462,15 @@ if __name__=="__main__":
     init_q = 0
     init_r = 0
 
-    init_el = np.deg2rad(5)
+    init_el = np.deg2rad(0)
     init_al = np.deg2rad(0)
     init_rud = 0
-    init_throttle = 100
+    init_throttle = 0
 
 
     goal_x = 10
     goal_y = 10
     goal_z = 10
-
 
     #test the force function
     states = np.array([
@@ -488,8 +487,8 @@ if __name__=="__main__":
 
     # Optimal control problem
     opti = ca.Opti()
-    dt = 0.1 # Time step
-    N = 20
+    dt = 0.01 # Time step
+    N = 200
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem
@@ -518,7 +517,7 @@ if __name__=="__main__":
     # set initial and terminal constraints
     opti.subject_to(X[:,0] == x0)
     # opti.subject_to(X[:,-1] == xF)
-    # opti.subject_to(U[:,0] == u0)
+    opti.subject_to(U[:,0] == u0)
     
 
     # set constraints to dynamics
@@ -534,11 +533,13 @@ if __name__=="__main__":
 
 
     for k in range(N):
-        # states = X[:,k]
-        # controls = U[:,k]
-        # state_next = X[:,k+1]
-        opti.subject_to(U[:,k]==u0) # Use initial control input
-        U[:,k] = u0
+        
+        # opti.subject_to(U[:,k]==u0) # Use initial control input
+        # U[:,k] = u0
+        # U[0,k] = 0
+        # U[1,k] = 0
+        # U[2,k] = 0
+        # U[3,k] = 0
 
         k1 = f(X[:,k], U[:,k])
         k2 = f(X[:,k] + dt/2 * k1, U[:,k])
@@ -547,17 +548,9 @@ if __name__=="__main__":
         x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
         opti.subject_to(X[:,k+1]==x_next) # Use initial state
 
-        # current_forces = aircraft.force_function(states, controls)
-        # current_moments = aircraft.moment_function(states, controls)
-        # k1 = f(states, controls, current_moments, current_forces)
-        # print(k1)
-        # k2 = f(states + dt/2 * k1, controls, current_moments, current_forces)
-        # k3 = f(states + dt/2 * k2, controls, current_moments, current_forces)
-        # k4 = f(states + dt * k3, controls, current_moments, current_forces)
-        # state_next_RK4 = states + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-        #print(state_next_RK4)
-        # opti.subject_to(X[:,k+1] == X[:,k] + dt * f(X[:,k], U[:,k]))
-        #opti.subject_to(X[:, k+1] == state_next_RK4)
+
+        # use eulers
+        #opti.subject_to(X[:,k+1] == X[:,k] + dt * f(X[:,k], U[:,k]))
 
     # set constraints to control inputs
     max_control_surface = np.deg2rad(25)
@@ -619,17 +612,18 @@ if __name__=="__main__":
     mean_x = sol.value(X[0,:]).mean()
     mean_y = sol.value(X[1,:]).mean()
     mean_z = sol.value(X[2,:]).mean()
+    max_z_range = np.array([sol.value(X[2,:]).max()-sol.value(X[2,:]).min()]).max() / 2.0
     ax.set_xlim(mean_x - max_range, mean_x + max_range)
     ax.set_ylim(mean_y - max_range, mean_y + max_range)
-    ax.set_zlim(mean_z - max_range, mean_z + max_range)
+    # ax.set_zlim(mean_z - max_z_range, mean_z + 30)
     ax.legend()
 
     #plot control inputs in subplots
     fig, axs = plt.subplots(4,1)
     axs[0].plot(sol.value(U[0,:]))
-    axs[0].set_ylabel('Elevator [rad]')
+    axs[0].set_ylabel('Aileron [rad]')
     axs[1].plot(sol.value(U[1,:]))
-    axs[1].set_ylabel('Aileron [rad]')
+    axs[1].set_ylabel('Elevator [rad]')
     axs[2].plot(sol.value(U[2,:]))
     axs[2].set_ylabel('Rudder [rad]')
     axs[3].plot(sol.value(U[3,:]))

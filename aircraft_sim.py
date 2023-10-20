@@ -732,7 +732,7 @@ if __name__=="__main__":
     input_thrust = 0 #newtons
 
     #begin simulation
-    n_iter = 30
+    n_iter = 200
     position_history = []
     attitude_history = []
     
