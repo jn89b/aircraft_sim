@@ -129,7 +129,7 @@ class LateralPlane():
         
         self.z_dot = ca.mtimes(airplane.A ,airplane.states) + \
             ca.mtimes(airplane.B ,airplane.controls)
-            
+                    
         #ODE right hand side function
         self.function = ca.Function('f', 
                         [self.states, self.controls],
@@ -212,7 +212,6 @@ class Optimization():
         
         self.lbx['X'][phi_index, :] = phi_min
         self.ubx['X'][phi_index, :] = phi_max
-        
         
         self.lbx['U'][da_index,:] = aileron_min
         self.ubx['U'][da_index,:] = aileron_max
@@ -360,7 +359,7 @@ if __name__ == '__main__':
     #initial states 
     init_states = [0, 0, 0, 0]
     
-    desired_states = [0, 0, 0, np.rad2deg(45)]
+    desired_states = [0, 0, 0, np.rad2deg(30)]
 
     #### Optimization Process ######### 
     t0 = 0

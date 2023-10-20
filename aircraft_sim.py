@@ -691,9 +691,9 @@ class AircraftSim():
         self.update_acc(sim_forces)
         self.update_velocity(delta_time)
         self.update_position(delta_time)
-    
 
-# Use as utility function
+
+# Use as utility
 def get_airplane_params(df:pd.DataFrame) -> dict:
     airplane_params = {}
     for index, row in df.iterrows():
@@ -709,14 +709,16 @@ if __name__=="__main__":
     airplane_params = get_airplane_params(df)
     aircraft = Aircraft(airplane_params)
 
-    airspeed = 20
+    airspeed = 25
     aircraft.position = np.array([0, 0, 0], dtype=float)
     aircraft.attitudes = np.array([0, 0, 0], dtype=float)
     aircraft.velocity_bf = np.array([airspeed, 0, 0], dtype=float)
     aircraft.angular_velocity_bf = np.array([0, 0, 0], dtype=float)
     aircraft.angular_acc_bf = np.array([0, 0, 0], dtype=float)
     aircraft.velocity_ef = np.array([airspeed, 0, 0], dtype=float)
-    aircraft.airspeed = airspeed
+    #aircraft.airspeed = 
+    #compute magnitude of velocity
+    aircraft.airspeed = np.linalg.norm(aircraft.velocity_bf)
 
     aircraft_sim = AircraftSim(aircraft)
 
@@ -725,12 +727,12 @@ if __name__=="__main__":
 
     #set up the inputs
     input_aileron_rad = np.deg2rad(0)
-    input_elevator_rad = np.deg2rad(-5)
+    input_elevator_rad = np.deg2rad(0)
     input_rudder_rad = 0
-    input_thrust = 150 #newtons
+    input_thrust = 0 #newtons
 
     #begin simulation
-    n_iter = 1000
+    n_iter = 30
     position_history = []
     attitude_history = []
     
