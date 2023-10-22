@@ -730,12 +730,12 @@ if __name__=="__main__":
 
     #set up the inputs
     input_aileron_rad = np.deg2rad(0)
-    input_elevator_rad = np.deg2rad(0)
+    input_elevator_rad = np.deg2rad(25)
     input_rudder_rad = 0
-    input_thrust = 0 #newtons
+    input_thrust = 15 #newtons
 
     #begin simulation
-    n_iter = 100
+    n_iter = 10
     position_history = []
     attitude_history = []
     

@@ -462,17 +462,11 @@ if __name__=="__main__":
     ])
     controls = np.array([init_al, init_el, init_rud, init_throttle])
 
-    # #test the force function
-    # forces = aircraft.compute_forces()
-    # print("force function", aircraft.force_function(states, controls))
-    # print("moment function", aircraft.moment_function(states, controls))
-
     #set max attitude
     max_phi = np.deg2rad(45)
     min_phi = np.deg2rad(-45)
     max_theta = np.deg2rad(25)
     min_theta = np.deg2rad(-25)
-
 
     #set the control surface limits
     max_control_surface = np.deg2rad(25)

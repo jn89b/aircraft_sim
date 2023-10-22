@@ -1,9 +1,14 @@
 import pandas as pd
 import numpy as np
 
-from src.AircraftDynamics import AircraftDynamics
-from src.Aircraft import AircraftInfo
-from src.utils import get_airplane_params
+from src.aircraft.AircraftDynamics import AircraftDynamics
+from src.aircraft.Aircraft import AircraftInfo
+from src.Utils import get_airplane_params
+
+"""
+Just evaluating the numerical approximations between the using 
+Euler's method and Runge-Kutta 4th order method.
+"""
 
 if __name__=="__main__":
     df = pd.read_csv("SIM_Plane_h_vals.csv")
@@ -34,11 +39,10 @@ if __name__=="__main__":
     aircraft_dynamics_rk = AircraftDynamics(aircraft_info_rk)
 
     print(aircraft_info_euler.states)
-
   
-    dt = 0.01    
+    dt = 0.01        
     t_init = 0.0
-    t_final = 10.0
+    t_final = 1
     N = int((t_final - t_init) / dt)
 
     input_aileron = controls['delta_a']
@@ -87,7 +91,6 @@ if __name__=="__main__":
 
     # # plot the results
     import matplotlib.pyplot as plt
-    plt.figure()
     
     #3d plot 
     from mpl_toolkits.mplot3d import Axes3D
@@ -113,7 +116,6 @@ if __name__=="__main__":
     ax1[0].set_ylabel('Roll (deg)')
     ax1[1].set_ylabel('Pitch (deg)')
     ax1[2].set_ylabel('Yaw (deg)')
-
 
     plt.show() 
 
