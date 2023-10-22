@@ -14,10 +14,10 @@ if __name__=="__main__":
                    'phi':0.0, 'theta':0.0, 'psi':0.0,
                    'p':0.0, 'q':0.0, 'r':0.0}
     
-    controls = {'delta_e':np.deg2rad(25.0), 
-                'delta_a':0.0, 
+    controls = {'delta_e':np.deg2rad(25), 
+                'delta_a':np.deg2rad(2), 
                 'delta_r':0.0, 
-                'delta_t':250.0}
+                'delta_t':15.0}
     
     aircraft_info_euler = AircraftInfo(
         airplane_params,
@@ -35,8 +35,11 @@ if __name__=="__main__":
 
     print(aircraft_info_euler.states)
 
-    N = 100
-    dt = 0.01
+  
+    dt = 0.01    
+    t_init = 0.0
+    t_final = 10.0
+    N = int((t_final - t_init) / dt)
 
     input_aileron = controls['delta_a']
     input_elevator = controls['delta_e']
@@ -57,7 +60,8 @@ if __name__=="__main__":
             dt
         )
 
-        print("in")
+        aircraft_info_euler.update_states(new_states_eulers)
+        euler_states.append(new_states_eulers)
 
         new_states_rk = aircraft_dynamics_rk.rk45(
             input_aileron,
@@ -68,9 +72,8 @@ if __name__=="__main__":
             dt
         )
         aircraft_info_rk.update_states(new_states_rk)
-        aircraft_info_euler.update_states(new_states_eulers)
 
-        euler_states.append(new_states_eulers)
+
         rk_states.append(new_states_rk)
 
     euler_states = pd.DataFrame(euler_states)
@@ -95,4 +98,23 @@ if __name__=="__main__":
             label='RK45')
     ax.legend()
 
+
+    #plot attitudes in euler angles in a subplot
+    fig1, ax1 = plt.subplots(3,1,sharex=True)
+    ax1[0].plot(np.rad2deg(euler_states['phi']), label='Euler')
+    ax1[0].plot(np.rad2deg(rk_states['phi']), label='RK45')
+
+    ax1[1].plot(np.rad2deg(euler_states['theta']), label='Euler')
+    ax1[1].plot(np.rad2deg(rk_states['theta']), label='RK45')
+
+    ax1[2].plot(np.rad2deg(euler_states['psi']), label='Euler')
+    ax1[2].plot(np.rad2deg(rk_states['psi']), label='RK45')
+    ax1[2].set_xlabel('Time (s)')
+    ax1[0].set_ylabel('Roll (deg)')
+    ax1[1].set_ylabel('Pitch (deg)')
+    ax1[2].set_ylabel('Yaw (deg)')
+
+
     plt.show() 
+
+    
