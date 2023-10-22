@@ -17,7 +17,7 @@ if __name__=="__main__":
     controls = {'delta_e':0.0, 
                 'delta_a':0.0, 
                 'delta_r':0.0, 
-                'delta_t':0.0}
+                'delta_t':250.0}
     
     aircraft_info_euler = AircraftInfo(
         airplane_params,
@@ -35,8 +35,8 @@ if __name__=="__main__":
 
     print(aircraft_info_euler.states)
 
-    N = 50
-    dt = 0.1
+    N = 100
+    dt = 0.01
 
     input_aileron = controls['delta_a']
     input_elevator = controls['delta_e']
