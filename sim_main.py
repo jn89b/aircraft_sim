@@ -57,7 +57,6 @@ if __name__=="__main__":
             dt
         )
 
-
         new_states_rk = aircraft_dynamics_rk.rk45(
             input_aileron,
             input_elevator,
