@@ -445,16 +445,15 @@ if __name__=="__main__":
     init_q = 0
     init_r = 0
 
-    init_el = np.deg2rad(1)
+    init_el = np.deg2rad(0)
     init_al = np.deg2rad(0)
     init_rud = 0
-    init_throttle = 200
+    init_throttle = 30
 
-    goal_x = 10
-    goal_y = 10
-    goal_z = 10
+    goal_x = 50
+    goal_y = 50
+    goal_z = -10
 
-    #test the force function
     states = np.array([
         init_x, init_y, init_z,
         init_u, init_v, init_w,
@@ -463,14 +462,28 @@ if __name__=="__main__":
     ])
     controls = np.array([init_al, init_el, init_rud, init_throttle])
 
-    forces = aircraft.compute_forces()
-    print("force function", aircraft.force_function(states, controls))
-    print("moment function", aircraft.moment_function(states, controls))
+    # #test the force function
+    # forces = aircraft.compute_forces()
+    # print("force function", aircraft.force_function(states, controls))
+    # print("moment function", aircraft.moment_function(states, controls))
+
+    #set max attitude
+    max_phi = np.deg2rad(45)
+    min_phi = np.deg2rad(-45)
+    max_theta = np.deg2rad(25)
+    min_theta = np.deg2rad(-25)
+
+
+    #set the control surface limits
+    max_control_surface = np.deg2rad(25)
+    min_control_surface = np.deg2rad(-25)
+    min_throttle = 5 # Newtons
+    max_throttle = 200 # Newtons
 
     # Optimal control problem
     opti = ca.Opti()
-    dt = 0.01 # Time step
-    N = 100 
+    dt = 0.1 # Time step
+    N = 30
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem
@@ -478,7 +491,7 @@ if __name__=="__main__":
     U = opti.variable(aircraft.num_controls, N) # Control vector
     
     x0 = opti.parameter(aircraft.num_states, 1) # Initial state
-    # xF = opti.parameter(aircraft.num_states, 1) # Final state
+    xF = opti.parameter(aircraft.num_states, 1) # Final state
     
     u0 = opti.parameter(aircraft.num_controls, 1) # Initial control input
 
@@ -489,11 +502,11 @@ if __name__=="__main__":
                                  init_phi, init_theta, init_psi, 
                                  init_p, init_q, init_r]))
     
-    # opti.set_value(xF, np.array([
-    #                              #goal_x, goal_y, goal_z, 
-    #                              0, 0, 0, 
-    #                              0, 0, 0, 
-    #                              0, 0, 0]))
+    opti.set_value(xF, np.array([
+                                 goal_x, goal_y, goal_z, 
+                                 25, 0, 0, 
+                                 0, 0, 0, 
+                                 0, 0, 0]))
     opti.set_value(u0, controls)
 
     # set initial and terminal constraints
@@ -501,46 +514,10 @@ if __name__=="__main__":
     # opti.subject_to(X[:,-1] == xF)
     opti.subject_to(U[:,0] == u0)
 
-    #let terminal constraints be free
-
-
-    # set constraints to dynamics
-    #set states to a numerical integration of the dynamics
-
-
-    # x = ca.MX.sym('x')
-    # y = ca.MX.sym('y')
-    # add_function = ca.Function('add_function', [x, y], [x, x+y])
-
-    # value = add_function(1, 2)
-    # print("value is", value[0], value[1])
-
-
-    for k in range(N):
-        
-        # opti.subject_to(U[:,k]==u0) # Use initial control input
-        U[:,k] = u0
-        # U[0,k] = 0
-        # U[1,k] = 0
-        # U[2,k] = 0
-        # U[3,k] = 0
-
-        # k1 = f(X[:,k], U[:,k])
-        # k2 = f(X[:,k] + dt/2 * k1, U[:,k])
-        # k3 = f(X[:,k] + dt/2 * k2, U[:,k])
-        # k4 = f(X[:,k] + dt * k3, U[:,k])
-        # x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-        # opti.subject_to(X[:,k+1]==x_next) # Use initial state
-
-
-        # use eulers
-        # opti.subject_to(X[:,k+1] == X[:,k] + (dt * f(X[:,k], U[:,k])))
-
-    # set constraints to control inputs
-    max_control_surface = np.deg2rad(25)
-    min_control_surface = np.deg2rad(-25)
-    min_throttle = 50 # Newtons
-    max_throttle = 200 # Newtons
+    # set constraints
+    #set the max and min values for the states
+    opti.subject_to(opti.bounded(min_phi, X[6,:], max_phi))
+    opti.subject_to(opti.bounded(min_theta, X[7,:], max_theta))
 
     #aileron
     opti.subject_to(opti.bounded(min_control_surface, U[0,:], max_control_surface))
@@ -552,13 +529,37 @@ if __name__=="__main__":
     opti.subject_to(opti.bounded(min_throttle, U[3,:], max_throttle))
 
     # set cost function 
-    # minimize the sum of the squares of the control inputs
-    # opti.minimize(ca.sumsqr(U))
+    # minimize the error between the final state and the goal state
+    #set weights for the cost function as a array
+    weights = np.array([1, 1, 1, 
+                        0, 0, 0,
+                        0, 0, 0, 
+                        0, 0, 0])
+    
+    weights_controls = np.array([0, 0, 0, 0])
+
+    #set the cost function to minimize error and the control inputs
+    # state_error = weights*ca.sumsqr((X[:, -1] - xF))
+    cost_fn = ca.sumsqr(weights * (X[:, -1] - xF) + ca.sumsqr(weights_controls*U**2))
+    opti.minimize(cost_fn) 
+
+
+    for k in range(N):
+        
+        k1 = f(X[:,k], U[:,k])
+        k2 = f(X[:,k] + dt/2 * k1, U[:,k])
+        k3 = f(X[:,k] + dt/2 * k2, U[:,k])
+        k4 = f(X[:,k] + dt * k3, U[:,k])
+        x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+        opti.subject_to(X[:,k+1]==x_next) # Use initial state
+
+        # use eulers
+        # opti.subject_to(X[:,k+1] == X[:,k] + (dt * f(X[:,k], U[:,k])))
 
     # solve the optimization problem
     opts = {
         'ipopt': {
-            'max_iter': 5000,
+            'max_iter': 100,
             'print_level': 2,
             'acceptable_tol': 1e-2,
             'acceptable_obj_change_tol': 1e-2,
@@ -590,6 +591,9 @@ if __name__=="__main__":
                -sol.value(X[2,0]), c='r', marker='o', label='start')
     ax.scatter(sol.value(X[0,-1]), sol.value(X[1,-1]), 
                -sol.value(X[2,-1]), c='g', marker='o', label='end')
+
+    #plot the goal
+    ax.scatter(goal_x, goal_y, -goal_z, c='b', marker='o', label='goal')
 
     #set axis equal
     max_range = np.array([sol.value(X[0,:]).max()-sol.value(X[0,:]).min(), sol.value(X[1,:]).max()-sol.value(X[1,:]).min(), sol.value(X[2,:]).max()-sol.value(X[2,:]).min()]).max() / 2.0
@@ -625,7 +629,16 @@ if __name__=="__main__":
     axs[2].set_ylabel('Yaw [deg]')
     axs[2].set_xlabel('Time [s]')
 
-
+    #plot the velocities
+    fig, axs = plt.subplots(3,1)
+    axs[0].plot(t_vec, sol.value(X[3,:]))
+    axs[0].set_ylabel('u [m/s]')
+    axs[1].plot(t_vec, sol.value(X[4,:]))
+    axs[1].set_ylabel('v [m/s]')
+    axs[2].plot(t_vec, sol.value(X[5,:]))
+    axs[2].set_ylabel('w [m/s]')
+    axs[2].set_xlabel('Time [s]')
+    
     plt.show()
 
 

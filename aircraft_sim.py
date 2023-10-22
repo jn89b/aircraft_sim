@@ -29,7 +29,6 @@ class Aircraft():
     def __init__(self, aircraft_params:dict) -> None:
         self.aircraft_params =  aircraft_params
         
-
         self.position = [0, 0, 0] #x,y,z
         self.attitudes = [0, 0, 0] #phi, theta, psi
         self.velocity_ef = [0, 0, 0] #x_dot, y_dot, z_dot
@@ -344,6 +343,7 @@ class AircraftSim():
             #check close to zero
             airspeed = self.aircraft.airspeed
 
+
         coefficient = self.aircraft.aircraft_params
         c_drag_q = coefficient["c_drag_q"]
         c_lift_q = coefficient["c_lift_q"]
@@ -461,8 +461,9 @@ class AircraftSim():
         """
         #make sure self.aircraft.acc_bf is a numpy array
         self.aircraft.acc_bf = np.array(self.aircraft.acc_bf)
-
+        print("acc_bf: ", self.aircraft.acc_bf)
         self.aircraft.velocity_bf += self.aircraft.acc_bf*delta_time
+        print("velocity_bf: ", self.aircraft.velocity_bf)
         # self.aircraft.velocity_bf[0] = self.aircraft.velocity_bf
 
         #update airspeed
@@ -683,6 +684,10 @@ class AircraftSim():
                                              input_rudder_rad,
                                              sim_forces)
         
+        print("sim_forces: ", sim_forces)
+        print("sim_moments: ", sim_moments)
+        print("attitudes: ", self.aircraft.attitudes)
+
         self.update_angular_acc(sim_moments)
         self.update_angular_velocity(sim_moments, delta_time)
         self.update_attitude(delta_time)
@@ -707,7 +712,7 @@ if __name__=="__main__":
     airplane_params = get_airplane_params(df)
     aircraft = Aircraft(airplane_params)
 
-    airspeed = 25
+    airspeed = 0.0
     aircraft.position = np.array([0, 0, 0], dtype=float)
     aircraft.attitudes = np.array([0, 0, 0], dtype=float)
     aircraft.velocity_bf = np.array([airspeed, 0, 0], dtype=float)
@@ -725,9 +730,9 @@ if __name__=="__main__":
 
     #set up the inputs
     input_aileron_rad = np.deg2rad(0)
-    input_elevator_rad = np.deg2rad(1)
+    input_elevator_rad = np.deg2rad(0)
     input_rudder_rad = 0
-    input_thrust = 200 #newtons
+    input_thrust = 0 #newtons
 
     #begin simulation
     n_iter = 100
@@ -747,8 +752,8 @@ if __name__=="__main__":
                                                 input_rudder_rad,
                                                 sim_forces)
     
-    print("sim_forces: ", sim_forces)
-    print("sim_moments: ", sim_moments)
+    # print("sim_forces: ", sim_forces)
+    # print("sim_moments: ", sim_moments)
 
     for i in range(n_iter):
 
@@ -764,14 +769,8 @@ if __name__=="__main__":
                             input_thrust,
                             dt)
         
-        # print("sim_forces: ", sim_forces)
-        # print("sim_acc deg/s^2 : ", np.deg2rad(aircraft.acc_bf))
-        # print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
-        # print("sim_moments: ", sim_moments)
-        # print("earth frame velocity: ", aircraft.velocity_ef)
-        # print("body frame velocity: ", aircraft.velocity_bf)
         current_position = aircraft.position
-        #print("current position: ", current_position)
+        print("current position: ", current_position)
         position_history.append([current_position[0],
                                  current_position[1],
                                  current_position[2]])
@@ -780,7 +779,7 @@ if __name__=="__main__":
                                 aircraft.attitudes[1],
                                 aircraft.attitudes[2]])
 
-        # print("roll, pitch, yaw: ", np.rad2deg(aircraft.attitudes))
+    
 
     #convert to numpy array
     x_position = []

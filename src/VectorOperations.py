@@ -1,14 +1,11 @@
 import math
 import numpy as np
-from scipy.spatial.transform import Rotation as R
 
 """
-Make sure my orientation matrices are right
-
-- Set BODY roll pitch yaw
-- Rotate to INERTIAL frame 
 
 https://academicflight.com/articles/kinematics/rotation-formalisms/rotation-matrix/
+
+Library to due all your vector and matrix operations 
 
 """
 
@@ -80,39 +77,3 @@ class Vector3D():
         self.x = self.array[0]
         self.y = self.array[1]
         self.z = self.array[2]
-
-class DirectionCosineMatrix:
-    def __init__(self):
-        self.matrix = np.identity(3)  # Initialize DCM as an identity matrix
-
-    def rotate(self, gyro, delta_time):
-        """
-        Rotate the DCM based on gyroscopic measurements.
-        gyro: 3D angular velocity vector (gyro.x, gyro.y, gyro.z)
-        delta_time: Time interval for the rotation
-        https://academicflight.com/articles/kinematics/rotation-formalis ms/rotation-matrix/
-        """
-
-        gyro_matrix = np.array([[0, -gyro[2], gyro[1]],
-                                [gyro[2], 0, -gyro[0]],
-                                [-gyro[1], gyro[0], 0]])
-                
-        # self.matrix += gyro_matrix.dot(self.matrix) * delta_time
-        
-
-
-    def normalize(self):
-        """
-        Normalize the DCM to maintain its orthogonality and determinant
-        """
-        norm = np.linalg.norm(self.matrix)
-        self.matrix /= norm
-
-    def transpose(self):
-        """
-        Transpose the DCM.
-        """
-        return np.transpose(self.matrix)
-
-
-
