@@ -1,0 +1,3 @@
+- Install pyvista
+- Install stl
+- pip install numpy-stl

@@ -26,7 +26,7 @@ if __name__=="__main__":
                    'p':0.0, 'q':0.0, 'r':0.0}
     
     controls = {'delta_e':np.deg2rad(25), 
-                'delta_a':np.deg2rad(0), 
+                'delta_a':np.deg2rad(5), 
                 'delta_r':0.0, 
                 'delta_t':150.0}
     
@@ -44,8 +44,6 @@ if __name__=="__main__":
     aircraft_dynamics_eulers = AircraftDynamics(aircraft_info_euler)
     aircraft_dynamics_rk = AircraftDynamics(aircraft_info_rk)
 
-    print(aircraft_info_euler.states)
-  
     dt = 0.01        
     t_init = 0.0
     t_final = 5.0
@@ -94,6 +92,10 @@ if __name__=="__main__":
     euler_states.columns = ['x','y','z','u','v','w','phi','theta','psi','p','q','r']
     rk_states.columns = ['x','y','z','u','v','w','phi','theta','psi','p','q','r']
 
+    #save rk45 states to csv
+    rk_states.to_csv("rk45_states.csv", index=False)
+
+
     print(euler_states)
     print("RK45", rk_states)
 
@@ -108,8 +110,6 @@ if __name__=="__main__":
     # ax.plot(rk_states['x'], rk_states['y'], -rk_states['z'], 'x-' ,
     #         label='RK45')
     ax.legend()
-
-
     #plot attitudes in euler angles in a subplot
     fig1, ax1 = plt.subplots(3,1,sharex=True)
     ax1[0].plot(np.rad2deg(euler_states['phi']), label='Euler')
@@ -124,7 +124,6 @@ if __name__=="__main__":
     ax1[0].set_ylabel('Roll (deg)')
     ax1[1].set_ylabel('Pitch (deg)')
     ax1[2].set_ylabel('Yaw (deg)')
-
 
     def update(frame):
         ax.cla()  # Clear the previous frame
@@ -210,9 +209,3 @@ if __name__=="__main__":
 
     ani = FuncAnimation(fig, update, frames=len(euler_states), interval=1)
     plt.show()
-
-
-    #plt.show() 
-
-
-    
