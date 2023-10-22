@@ -217,8 +217,3 @@ class AircraftInfo():
         """
         return self.controls
     
-        
-
-
-
-

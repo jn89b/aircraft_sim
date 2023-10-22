@@ -1,8 +1,8 @@
 import numpy as np
 import math 
 import pandas as pd
-from src.VectorOperations import euler_dcm_inertial_to_body, euler_dcm_body_to_inertial
-from src.VectorOperations import compute_B_matrix
+from src.math_lib.VectorOperations import euler_dcm_inertial_to_body, euler_dcm_body_to_inertial
+from src.math_lib.VectorOperations import compute_B_matrix
 import matplotlib.pyplot as plt
 
 """
@@ -69,7 +69,8 @@ class AircraftSim():
 
     def compute_aoa(self):
         """computes the angle of attack in radians"""
-        alpha_rad = np.arctan2(self.aircraft.velocity_bf[2], self.aircraft.velocity_bf[0])
+        alpha_rad = np.arctan2(self.aircraft.velocity_bf[2], 
+                               self.aircraft.velocity_bf[0])
 
         return alpha_rad
     
@@ -513,7 +514,7 @@ class AircraftSim():
             return current_states
         
         #compute the forces
-        sim_forces = self.compute_forces(input_aileron_rad,
+        forces = self.compute_forces(input_aileron_rad,
                                             input_elevator_rad,
                                             input_rudder_rad,
                                             input_thrust,
@@ -521,29 +522,29 @@ class AircraftSim():
                                             approx_states=approx_states)
         
         #compute the moments
-        sim_moments = self.compute_moments(input_aileron_rad,
+        moments = self.compute_moments(input_aileron_rad,
                                             input_elevator_rad,
                                             input_rudder_rad,
-                                            sim_forces,
+                                            forces,
                                             use_approx_ang_vel_bf=True,
                                             approx_states=approx_states)
         
         projected_states = {}
 
         #compute the angular acceleration
-        sim_angular_acc_bf = self.project_angular_acc(sim_moments, 
+        sim_angular_acc_bf = self.project_angular_acc(moments, 
                                                       approx_states)
         projected_states['angular_acc_bf'] = sim_angular_acc_bf
 
         sim_angular_vel_bf = self.project_angular_velocity(
-            sim_moments, delta_time, approx_states)
+            moments, delta_time, approx_states)
         projected_states['angular_velocity_bf'] = sim_angular_vel_bf
 
         sim_attitudes = self.project_attitude(
             delta_time, approx_states, sim_angular_vel_bf)
         projected_states['attitudes'] = sim_attitudes
 
-        sim_acc_bf = self.project_acc(sim_forces, approx_states, projected_states)
+        sim_acc_bf = self.project_acc(forces, approx_states, projected_states)
         projected_states['acc_bf'] = sim_acc_bf
 
         sim_velocity_bf = self.project_velocity(
@@ -718,7 +719,7 @@ if __name__=="__main__":
     aircraft.velocity_bf = np.array([airspeed, 0, 0], dtype=float)
     aircraft.angular_velocity_bf = np.array([0, 0, 0], dtype=float)
     aircraft.angular_acc_bf = np.array([0, 0, 0], dtype=float)
-    aircraft.velocity_ef = np.array([airspeed, 0, 0], dtype=float)
+    aircraft.velocity_ef = np.array([0, 0, 0], dtype=float)
     #aircraft.airspeed = 
     #compute magnitude of velocity
     aircraft.airspeed = np.linalg.norm(aircraft.velocity_bf)
@@ -735,7 +736,7 @@ if __name__=="__main__":
     input_thrust = 15 #newtons
 
     #begin simulation
-    n_iter = 10
+    n_iter = 2000
     position_history = []
     attitude_history = []
     
@@ -771,6 +772,7 @@ if __name__=="__main__":
         
         current_position = aircraft.position
         print("current position: ", current_position)
+        print("type: ", type(current_position[0]))
         position_history.append([current_position[0],
                                  current_position[1],
                                  current_position[2]])

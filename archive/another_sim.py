@@ -1,8 +1,10 @@
 import numpy as np
 import math 
 import pandas as pd
-from src.VectorOperations import euler_dcm_inertial_to_body, euler_dcm_body_to_inertial
-from src.VectorOperations import compute_B_matrix
+
+# link back one directory
+from src.math_lib.VectorOperations import euler_dcm_inertial_to_body, euler_dcm_body_to_inertial
+from src.math_lib.VectorOperations import compute_B_matrix
 import matplotlib.pyplot as plt
 
 """
@@ -266,7 +268,7 @@ class AircraftSim():
         qbar = 0.5*rho*self.aircraft.airspeed**2
 
         #check close to zero
-        airspeed = self.aircraft.airspeed
+        # airspeed = self.aircraft.airspeed
         if airspeed == 0:
             f_ax_b = 0 
             f_ay_b = 0
@@ -292,10 +294,12 @@ class AircraftSim():
         Updates the acceleration of the aircraft in the body frame
         """
 
-        #compute angular rates
+        #compute angular rates this has already been changed 
         p = self.aircraft.angular_velocity_bf[0]
         q = self.aircraft.angular_velocity_bf[1]
         r = self.aircraft.angular_velocity_bf[2]
+
+        #these havent changed yet
         u = self.aircraft.velocity_bf[0]
         v = self.aircraft.velocity_bf[1]
         w = self.aircraft.velocity_bf[2]

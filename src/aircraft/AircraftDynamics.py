@@ -21,8 +21,8 @@ class AircraftDynamics():
         Computes the angle of attack
         """
         #check divide by zero 
-        if u == 0:
-            return 0.0
+        # if u == 0:
+        #     return 0.0
         
         #compute the angle of attack
         return np.arctan2(w, u)
@@ -33,8 +33,8 @@ class AircraftDynamics():
         Computes the sideslip angle
         """
         #check divide by zero 
-        if u == 0:
-            return 0.0
+        # if u == 0:
+        #     return 0.0
         
         return np.arctan2(v, u)
     
@@ -109,7 +109,7 @@ class AircraftDynamics():
         qbar = 0.5 * self.aircraft.rho * effective_airspeed**2 * s
 
 
-        if effective_airspeed <= 1e-6:
+        if effective_airspeed == 0:
             la, ma, na = 0, 0, 0
         else:
             la = qbar * b * (c_l_0 + c_l_b * beta +
@@ -228,7 +228,7 @@ class AircraftDynamics():
         c_z_q = -c_drag_q*np.sin(alpha_rad) - c_lift_q*np.cos(alpha_rad)
 
         #check if airsped is close to zero
-        if airspeed <= 1e-6:
+        if airspeed == 0:
             f_ax_b = 0 
             f_ay_b = 0
             f_az_b = 0
@@ -307,18 +307,28 @@ class AircraftDynamics():
         
         # compute angular velocities
         current_ang_velocities = states[9:12]
-        phi_theta_psi_dot = np.dot(B, current_ang_velocities)
+        #phi_theta_psi_dot = np.dot(B, current_ang_velocities)
+        phi_theta_psi_dot = np.matmul(B, p_q_r_dot)
 
         g = 9.81
         #compute angular rates
-        p = states[9]
-        q = states[10]
-        r = states[11]
+        # p = states[9]
+        # q = states[10]
+        # r = states[11]
+        # u = states[3]
+        # v = states[4]
+        # w = states[5]
+
+
+        current_attitudes = states[6:9]
+
+        p = p_q_r_dot[0]
+        q = p_q_r_dot[1]
+        r = p_q_r_dot[2]
         u = states[3]
         v = states[4]
         w = states[5]
 
-        current_attitudes = states[6:9]
         gravity_body_frame = np.array([
             g*np.sin(current_attitudes[1]), 
             g*np.sin(current_attitudes[0])*np.cos(current_attitudes[1]), 
@@ -327,14 +337,15 @@ class AircraftDynamics():
         mass = self.aircraft.aircraft_params['mass']
         
         #accelerations
-        u_dot = (forces[0]/mass) - gravity_body_frame[0] - (q*w)  + (r*v)
-        v_dot = (forces[1]/mass) + gravity_body_frame[1] - (r*u)  + (p*w)
-        w_dot = (forces[2]/mass) + gravity_body_frame[2] - (p*v)  + (q*u)
+        u_dot = forces[0]/mass - gravity_body_frame[0] - (q*w)  + (r*v)
+        v_dot = forces[1]/mass + gravity_body_frame[1] - (r*u)  + (p*w)
+        w_dot = forces[2]/mass + gravity_body_frame[2] - (p*v)  + (q*u)
 
+        
         #velocities
         dcm_body_to_inertial = euler_dcm_body_to_inertial(phi, theta, psi)
         body_vel = np.array([u, v, w])
-        inertial_vel = np.dot(dcm_body_to_inertial, body_vel) 
+        inertial_vel = np.matmul(dcm_body_to_inertial, body_vel) 
         x_dot = inertial_vel[0]
         y_dot = inertial_vel[1]
         z_dot = inertial_vel[2]
@@ -410,7 +421,7 @@ class AircraftDynamics():
                                         current_states + k3)
         
         new_states = current_states + (k1 + 2*k2 + 2*k3 + k4) / 6
-
+     
         if use_noise == True:
             new_states = self.add_noise_to_states(new_states)
 

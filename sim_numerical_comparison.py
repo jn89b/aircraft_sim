@@ -11,6 +11,8 @@ Euler's method and Runge-Kutta 4th order method.
 """
 
 if __name__=="__main__":
+    #check if csv file exists
+
     df = pd.read_csv("SIM_Plane_h_vals.csv")
     airplane_params = get_airplane_params(df)
     
@@ -20,7 +22,7 @@ if __name__=="__main__":
                    'p':0.0, 'q':0.0, 'r':0.0}
     
     controls = {'delta_e':np.deg2rad(25), 
-                'delta_a':np.deg2rad(2), 
+                'delta_a':np.deg2rad(0), 
                 'delta_r':0.0, 
                 'delta_t':15.0}
     
@@ -42,8 +44,9 @@ if __name__=="__main__":
   
     dt = 0.01        
     t_init = 0.0
-    t_final = 1
+    t_final = 20
     N = int((t_final - t_init) / dt)
+    print(N)
 
     input_aileron = controls['delta_a']
     input_elevator = controls['delta_e']
@@ -77,6 +80,7 @@ if __name__=="__main__":
         )
         aircraft_info_rk.update_states(new_states_rk)
 
+        print(type(new_states_rk[7]) )
 
         rk_states.append(new_states_rk)
 
