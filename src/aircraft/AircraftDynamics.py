@@ -311,14 +311,6 @@ class AircraftDynamics():
         phi_theta_psi_dot = np.matmul(B, p_q_r_dot)
 
         g = 9.81
-        #compute angular rates
-        # p = states[9]
-        # q = states[10]
-        # r = states[11]
-        # u = states[3]
-        # v = states[4]
-        # w = states[5]
-
 
         current_attitudes = states[6:9]
 
@@ -341,7 +333,7 @@ class AircraftDynamics():
         v_dot = forces[1]/mass + gravity_body_frame[1] - (r*u)  + (p*w)
         w_dot = forces[2]/mass + gravity_body_frame[2] - (p*v)  + (q*u)
 
-        
+
         #velocities
         dcm_body_to_inertial = euler_dcm_body_to_inertial(phi, theta, psi)
         body_vel = np.array([u, v, w])

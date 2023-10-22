@@ -1,9 +1,13 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation
 from src.aircraft.AircraftDynamics import AircraftDynamics
 from src.aircraft.Aircraft import AircraftInfo
 from src.Utils import get_airplane_params
+
 
 """
 Just evaluating the numerical approximations between the using 
@@ -24,7 +28,7 @@ if __name__=="__main__":
     controls = {'delta_e':np.deg2rad(25), 
                 'delta_a':np.deg2rad(0), 
                 'delta_r':0.0, 
-                'delta_t':15.0}
+                'delta_t':150.0}
     
     aircraft_info_euler = AircraftInfo(
         airplane_params,
@@ -44,7 +48,7 @@ if __name__=="__main__":
   
     dt = 0.01        
     t_init = 0.0
-    t_final = 20
+    t_final = 5.0
     N = int((t_final - t_init) / dt)
     print(N)
 
@@ -80,7 +84,6 @@ if __name__=="__main__":
         )
         aircraft_info_rk.update_states(new_states_rk)
 
-        print(type(new_states_rk[7]) )
 
         rk_states.append(new_states_rk)
 
@@ -92,6 +95,7 @@ if __name__=="__main__":
     rk_states.columns = ['x','y','z','u','v','w','phi','theta','psi','p','q','r']
 
     print(euler_states)
+    print("RK45", rk_states)
 
     # # plot the results
     import matplotlib.pyplot as plt
@@ -99,10 +103,10 @@ if __name__=="__main__":
     #3d plot 
     from mpl_toolkits.mplot3d import Axes3D
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
-    ax.plot(euler_states['x'], euler_states['y'], -euler_states['z'], 'o-', 
-            label='Euler',)
-    ax.plot(rk_states['x'], rk_states['y'], -rk_states['z'], 'x-' ,
-            label='RK45')
+    # ax.plot(euler_states['x'], euler_states['y'], -euler_states['z'], 'o-', 
+    #         label='Euler',)
+    # ax.plot(rk_states['x'], rk_states['y'], -rk_states['z'], 'x-' ,
+    #         label='RK45')
     ax.legend()
 
 
@@ -121,6 +125,94 @@ if __name__=="__main__":
     ax1[1].set_ylabel('Pitch (deg)')
     ax1[2].set_ylabel('Yaw (deg)')
 
-    plt.show() 
+
+    def update(frame):
+        ax.cla()  # Clear the previous frame
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title('Aircraft Animation')
+
+        #keep last 100 frames
+        frame_len = 50
+        if frame > frame_len:
+            x_positions = euler_states['x'][frame-frame_len:frame]
+            y_positions = euler_states['y'][frame-frame_len:frame]
+            z_positions = euler_states['z'][frame-frame_len:frame]
+        else:
+            x_positions = [euler_states['x'][frame], rk_states['x'][frame]]
+            y_positions = [euler_states['y'][frame], rk_states['y'][frame]]
+            z_positions = [-euler_states['z'][frame], -rk_states['z'][frame]]
+        # else:
+
+        # Plot the new positions for each frame
+        print("Frame: ", frame)
+        print(x_positions, y_positions, z_positions)
+        ax.plot(x_positions, y_positions, z_positions, 'o-', label='Euler and RK45')
+        ax.legend()
+
+        # Get heading, pitch, and roll angles for the current frame
+        heading = euler_states['psi'][frame]
+        pitch = euler_states['theta'][frame]
+        roll = euler_states['phi'][frame]
+
+        # Draw the aircraft's orientation based on heading, pitch, and roll
+        #draw_aircraft(ax, x_positions, y_positions, z_positions, heading, pitch, roll)
+
+        pos_bounds = 0.5
+        # Set axis limits based on the current frame's positions
+        ax.set_xlim(min(x_positions) - pos_bounds, max(x_positions) + pos_bounds)
+        ax.set_ylim(min(y_positions) - pos_bounds, max(y_positions) + pos_bounds)
+        ax.set_zlim(min(z_positions) - pos_bounds, max(z_positions) + pos_bounds)
+
+        # Draw the aircraft's orientation based on heading, pitch, and roll
+        #draw_aircraft(ax, euler_states['x'][frame], euler_states['y'][frame], -euler_states['z'][frame], heading, pitch, roll)
+
+    # Function to draw the aircraft orientation
+    def draw_aircraft(ax, x, y, z, heading, pitch, roll):
+        # Define aircraft body dimensions (for example)
+        body_length = 5
+        body_width = 1
+        body_height = 1
+
+        # Calculate body orientation
+        rotation_matrix = np.array([
+            [np.cos(heading) * np.cos(pitch),
+            np.cos(heading) * np.sin(pitch) * np.sin(roll) - np.sin(heading) * np.cos(roll),
+            np.cos(heading) * np.sin(pitch) * np.cos(roll) + np.sin(heading) * np.sin(roll)],
+            [np.sin(heading) * np.cos(pitch),
+            np.sin(heading) * np.sin(pitch) * np.sin(roll) + np.cos(heading) * np.cos(roll),
+            np.sin(heading) * np.sin(pitch) * np.cos(roll) - np.cos(heading) * np.sin(roll)],
+            [-np.sin(pitch),
+            np.cos(pitch) * np.sin(roll),
+            np.cos(pitch) * np.cos(roll)]
+        ])
+
+        # Define body vertices in body-fixed frame
+        body_vertices = np.array([
+            [body_length / 2, 0, 0],
+            [-body_length / 2, body_width / 2, 0],
+            [-body_length / 2, -body_width / 2, 0],
+            [-body_length / 2, -body_width / 2, -body_height],
+            [-body_length / 2, body_width / 2, -body_height],
+            [body_length / 2, 0, -body_height]
+        ])
+
+        # Rotate body vertices to world frame
+        rotated_vertices = np.dot(body_vertices, rotation_matrix.T)
+        rotated_vertices += np.array([x, y, z])  # Translate to the aircraft position
+
+        # Draw the aircraft body
+        ax.plot3D(rotated_vertices[:, 0], rotated_vertices[:, 1], rotated_vertices[:, 2], color='b')
+
+    # Create the animation
+    fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
+
+    ani = FuncAnimation(fig, update, frames=len(euler_states), interval=1)
+    plt.show()
+
+
+    #plt.show() 
+
 
     

@@ -49,7 +49,7 @@ class AircraftInfo():
                  aircraft_init_states:dict, 
                  aircraft_init_controls:dict) -> None:
         self.aircraft_params = aircraft_params
-
+        
         self.x = None
         self.y = None
         self.z = None
