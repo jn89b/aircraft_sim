@@ -1,9 +1,9 @@
 import pandas as pd
+import numpy as np
 
 from src.AircraftDynamics import AircraftDynamics
 from src.Aircraft import AircraftInfo
 from src.utils import get_airplane_params
-
 
 if __name__=="__main__":
     df = pd.read_csv("SIM_Plane_h_vals.csv")
@@ -14,7 +14,7 @@ if __name__=="__main__":
                    'phi':0.0, 'theta':0.0, 'psi':0.0,
                    'p':0.0, 'q':0.0, 'r':0.0}
     
-    controls = {'delta_e':0.0, 
+    controls = {'delta_e':np.deg2rad(25.0), 
                 'delta_a':0.0, 
                 'delta_r':0.0, 
                 'delta_t':250.0}
@@ -56,6 +56,8 @@ if __name__=="__main__":
             aircraft_info_euler.states,
             dt
         )
+
+        print("in")
 
         new_states_rk = aircraft_dynamics_rk.rk45(
             input_aileron,
