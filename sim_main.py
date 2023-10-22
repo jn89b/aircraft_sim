@@ -87,9 +87,9 @@ if __name__=="__main__":
     #3d plot 
     from mpl_toolkits.mplot3d import Axes3D
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
-    ax.plot(euler_states['x'], euler_states['y'], euler_states['z'], 'o-', 
+    ax.plot(euler_states['x'], euler_states['y'], -euler_states['z'], 'o-', 
             label='Euler',)
-    ax.plot(rk_states['x'], rk_states['y'], rk_states['z'], 'x-' ,
+    ax.plot(rk_states['x'], rk_states['y'], -rk_states['z'], 'x-' ,
             label='RK45')
     ax.legend()
 
