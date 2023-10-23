@@ -163,26 +163,50 @@ if __name__=="__main__":
         #     color_vector.append((0,0,1,alpha))
 
         # Plot the new positions for each frame
+        # for i in range(len(x_positions)):
+            # ax.scatter(x_positions[i], y_positions[i], z_positions[i], color='b', alpha=alpha_vector[i])
         ax.plot(x_positions, y_positions, z_positions, 'o-', color='b', label='Euler and RK45')
         ax.legend()
-        
-        return ax
+
+    # Function to draw the aircraft orientation
+    def draw_aircraft(ax, x, y, z, heading, pitch, roll):
+        # Define aircraft body dimensions (for example)
+        body_length = 5
+        body_width = 1
+        body_height = 1
+
+        # Calculate body orientation
+        rotation_matrix = np.array([
+            [np.cos(heading) * np.cos(pitch),
+            np.cos(heading) * np.sin(pitch) * np.sin(roll) - np.sin(heading) * np.cos(roll),
+            np.cos(heading) * np.sin(pitch) * np.cos(roll) + np.sin(heading) * np.sin(roll)],
+            [np.sin(heading) * np.cos(pitch),
+            np.sin(heading) * np.sin(pitch) * np.sin(roll) + np.cos(heading) * np.cos(roll),
+            np.sin(heading) * np.sin(pitch) * np.cos(roll) - np.cos(heading) * np.sin(roll)],
+            [-np.sin(pitch),
+            np.cos(pitch) * np.sin(roll),
+            np.cos(pitch) * np.cos(roll)]
+        ])
+
+        # Define body vertices in body-fixed frame
+        body_vertices = np.array([
+            [body_length / 2, 0, 0],
+            [-body_length / 2, body_width / 2, 0],
+            [-body_length / 2, -body_width / 2, 0],
+            [-body_length / 2, -body_width / 2, -body_height],
+            [-body_length / 2, body_width / 2, -body_height],
+            [body_length / 2, 0, -body_height]
+        ])
+
+        # Rotate body vertices to world frame
+        rotated_vertices = np.dot(body_vertices, rotation_matrix.T)
+        rotated_vertices += np.array([x, y, z])  # Translate to the aircraft position
+
+        # Draw the aircraft body
+        ax.plot3D(rotated_vertices[:, 0], rotated_vertices[:, 1], rotated_vertices[:, 2], color='b')
 
     # Create the animation
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
 
-    # Function to initialize the animation (blit needs this function)
-    def init():
-        # Remove the initial plot (or any other objects you want to blit)
-        # initial_plot.pop(0).remove()
-        return ax
-
-    uas_paths = []
-    uas_paths.append([x_positions, y_positions, z_positions])
-    
-    lines = ax.plot([], [], [], linewidth=2)[0] 
-                        for _ in range(len(uas_paths))
-
-    ani = FuncAnimation(fig, update, init_func=init, 
-                        frames=len(euler_states), interval=30, blit=True)
+    ani = FuncAnimation(fig, update, frames=len(euler_states), interval=30)
     plt.show()

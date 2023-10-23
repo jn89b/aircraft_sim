@@ -8,15 +8,26 @@ from src.math_lib.VectorOperations import euler_dcm_body_to_inertial, \
 
 
 class DataVisualization():
-    def __init__(self, data:pd.DataFrame) -> None:
+    def __init__(self, data:pd.DataFrame, keep_every:int=1) -> None:
+        # self.data = data.iloc[::2, :]
         self.data = data
+        self.data = self.data.iloc[::keep_every, :]        
+
+        #reorder the index
+        self.data = self.data.reset_index(drop=True)
+
+        #keep every 2n
+        #self.data = self.data.iloc[::2, :]
         
+        print("data shape: ", self.data.shape)
+
         #this is stupid but I need to do this to get the wing span
         self.wing_span = 5 #meters
         self.fuselage_length = 3 #meters
-        self.compute_fuselage_wing_positions()
+        self.position_list = self.compute_fuselage_wing_positions()
 
-    def compute_fuselage_wing_positions(self):
+
+    def compute_fuselage_wing_positions(self) -> list:
         # computes the right and left wing positions in inertial frame
         x_positions = self.data['x'].values
         y_positions = self.data['y'].values
@@ -32,6 +43,7 @@ class DataVisualization():
         back_fuselage_positions = []
 
         for i in range(len(x_positions)):
+
             aircraft_position = np.array([x_positions[i], y_positions[i], z_positions[i]])
             dcm_body_to_inertial = euler_dcm_body_to_inertial(phi_angles[i], 
                                                               theta_angles[i], 
@@ -68,7 +80,19 @@ class DataVisualization():
         self.data['back_fuselage_y'] = [x[1] for x in back_fuselage_positions]
         self.data['back_fuselage_z'] = [x[2] for x in back_fuselage_positions]
 
-    def animate(self, interval:int=1):
+        right_wing_positions = np.array(right_wing_positions)
+        left_wing_positions = np.array(left_wing_positions)
+        front_fuselage_positions = np.array(front_fuselage_positions)
+        back_fuselage_positions = np.array(back_fuselage_positions)
+        aircraft_position = np.array([x_positions, y_positions, z_positions]).T
+
+        position_list = [aircraft_position, right_wing_positions, left_wing_positions,
+                        front_fuselage_positions, back_fuselage_positions]
+        
+        return position_list
+
+
+    def animate_local(self, interval:int=1) -> FuncAnimation:
         # Create the animation
         fig, self.ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
 
@@ -78,12 +102,12 @@ class DataVisualization():
         #set background color to black
         fig.patch.set_facecolor((0.529, 0.808, 0.922))
 
+        ani = FuncAnimation(fig, self.update_local, frames=len(self.data), interval=interval)
 
-        ani = FuncAnimation(fig, self.update, frames=len(self.data), interval=interval)
+        # plt.show()
+        return ani 
 
-        plt.show()
-
-    def update(self, frame):
+    def update_local(self, frame):
         
         self.ax.cla()
         self.ax.scatter(self.data['x'][frame], 
@@ -168,17 +192,109 @@ class DataVisualization():
         self.ax.legend(bbox_to_anchor=(1.0,1), loc="upper right")
 
 
+
+    def animate_global(self) -> FuncAnimation:
+        """
+        Animate global position 
+        """
+
+        fig1, self.ax1 = plt.subplots(1,1,subplot_kw={'projection':'3d'})
+
+        lines = [self.ax1.plot([], [], [], linewidth=1)[0] 
+                        for _ in range(len(self.position_list))]
+
+        pts = [self.ax1.plot([], [], [], 'o')[0] 
+                        for _ in range(len(self.position_list))]
+        
+        x_list = [x[:,0] for x in self.position_list]
+        y_list = [x[:,1] for x in self.position_list]
+        z_list = [x[:,2] for x in self.position_list]
     
+        #set axis limits
+        self.ax1.set_xlim3d([min(x_list[0]), max(x_list[0])])
+        self.ax1.set_xlabel('X')
+
+        self.ax1.set_ylim3d([min(y_list[0]), max(y_list[0])])
+        self.ax1.set_ylabel('Y')
+
+        self.ax1.set_zlim3d([min(z_list[0]), max(z_list[0])])
+        self.ax1.set_zlabel('Z')
+
+        color_list = ['b', 'g', 'g', 'r', 'r']
+        
+        for i in range(len(pts)):
+            pts[i].set_color(color_list[i])
+            lines[i].set_color(color_list[i])
+
+        
+        def init():
+            for line in lines:
+                line.set_data([], [])
+                line.set_3d_properties([])
+            for pt in pts:
+                pt.set_data([], [])
+                pt.set_3d_properties([])
+            return lines + pts
+        
+        def update(i):
+            # we'll step two time-steps per frame.  This leads to nice results.
+            # i = (2 * i) % x_t.shape[0]
+
+            # for line, pt, xi in zip(lines, pts, x_t):
+            time_span = len(self.data)
+            alpha_vec = np.linspace(0, 1, time_span)
+
+            for j, (line,pt) in enumerate(zip(lines,pts)):
+            # for j, (line,pt) in enumerate(zip(self.lines,self.pts)):
+                
+                #check if out of bounds
+                # if self.x_list[j][i] <= self.x_bounds[0] or \
+                #     self.x_list[j][i] >= self.x_bounds[1]:
+                #         print("out of bounds", self.x_list[j][i])
+                #         continue
+                
+                if i < time_span:
+                    interval = 0
+                else:
+                    interval = i - time_span
+                
+                #set lines 
+                # line.set_data(x_list[j][interval:i], y_list[j][interval:i])
+                # line.set_3d_properties(z_list[j][interval:i])
+
+                # # # #set points
+
+                #update the alpha based on the interval 
+                #get the difference between the current interval and the current frame
+                # diff = i - interval
+                # alpha = alpha_vec[diff]
+
+                # update the alpha for the points based on the interval
+                # for k in range(interval, i):
+                #     print(interval)
+                #     pts[j].set_alpha(alpha_vec[k])
+
+                pt.set_data(x_list[j][interval:i], y_list[j][interval:i])
+                pt.set_3d_properties(z_list[j][interval:i])
+
+                #changing views
+                # self.ax.view_init(60, 0.3 * i)
+                # self.fig.canvas.draw()
 
 
+            # fig.canvas.draw()
+            return lines + pts
+        
+        num_frames = len(self.data)
+        ani = FuncAnimation(fig1, update, frames=num_frames, interval=1, repeat=False,
+                            init_func=init, blit=True)
+        
+        return ani
 
-
-
-
+        
 
 
         
 
 
 
-    

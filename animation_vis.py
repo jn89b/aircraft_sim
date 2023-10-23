@@ -85,9 +85,7 @@ if __name__=="__main__":
                 [data['y'][frame], back_inertial[1]], 
                 [data['z'][frame], back_inertial[2]], 
                 color='red', linestyle='--', linewidth=2)
-        
-
-        
+                
         #ax.scatter(right_wing_inertial[0], right_wing_inertial[1], right_wing_inertial[2], color='red', label='Right Wing')
 
         inertial_vel = dcm_body_to_inertial @ body_frame_vector
