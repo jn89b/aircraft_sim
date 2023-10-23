@@ -9,6 +9,8 @@ from src.math_lib.VectorOperations import euler_dcm_body_to_inertial, euler_dcm_
 
 Be able to animate the position and direction vectors of the aircraft in 3D space
 
+
+Keep in mind this is all in NED frames
 """
 
 if __name__=="__main__":
@@ -21,7 +23,7 @@ if __name__=="__main__":
     
     # wing span of the aircraft to the left and right of center line of the aircraft
     wing_span = 5 #meters 
-
+    fuse_length = 10 #meters
 
     # Create a figure and a 3D axis
     fig = plt.figure()
@@ -34,8 +36,6 @@ if __name__=="__main__":
         # Plot positions
         ax.scatter(data['x'][frame], data['y'][frame], data['z'][frame], color='b', label='Position')
         
-
-
         # Plot body frame direction vector (assuming unit vectors for simplicity)
         body_frame_vector = np.array([data['u'][frame], data['v'][frame], data['w'][frame]])
 
@@ -56,14 +56,37 @@ if __name__=="__main__":
                 right_wing_inertial[0] - data['x'][frame], 
                 right_wing_inertial[1] - data['y'][frame], 
                 right_wing_inertial[2] - data['z'][frame], 
-                color='black', label='Right Wing')
+                color='green', label='Right Wing', linestyle='--')
         
         #draw a quiver from the aircraft position to the left wing
         ax.quiver(data['x'][frame], data['y'][frame], data['z'][frame],
                 left_wing_inertial[0] - data['x'][frame], 
                 left_wing_inertial[1] - data['y'][frame], 
                 left_wing_inertial[2] - data['z'][frame], 
-                color='black', label='Left Wing')
+                color='green', linestyle='--')
+        
+        #do the front and back of the aircraft
+        front = np.array([fuse_length/2, 0, 0])
+        back = np.array([-fuse_length/2, 0, 0])
+
+        front_inertial = aircraft_position + np.dot(dcm_body_to_inertial, front)
+        back_inertial = aircraft_position + np.dot(dcm_body_to_inertial, back)
+
+        #draw a quiver from the aircraft position to the front
+        ax.quiver(data['x'][frame], data['y'][frame], data['z'][frame],
+                front_inertial[0] - data['x'][frame], 
+                front_inertial[1] - data['y'][frame], 
+                front_inertial[2] - data['z'][frame], 
+                color='red', label='Front', linestyle='--')
+        
+        #draw a quiver from the aircraft position to the back
+        #plot without the quiver
+        ax.plot([data['x'][frame], back_inertial[0]], 
+                [data['y'][frame], back_inertial[1]], 
+                [data['z'][frame], back_inertial[2]], 
+                color='red', linestyle='--', linewidth=2)
+        
+
         
         #ax.scatter(right_wing_inertial[0], right_wing_inertial[1], right_wing_inertial[2], color='red', label='Right Wing')
 
@@ -74,17 +97,10 @@ if __name__=="__main__":
         
         ax.quiver(data['x'][frame], data['y'][frame], data['z'][frame], 
                 inertial_vel[0], inertial_vel[1], inertial_vel[2], 
-                color='blueviolet', label='Inertial Frame Direction')
+                color='blueviolet', label='Direction Vector')
 
-        # Project individual axes of the body frame vector
-        colors = ['r', 'g', 'b']
-        # for i in range(3):
-        #     projection_vector = np.zeros(3)
-        #     projection_vector[i] = inertial_vel[i]  # Only one non-zero component at a time
-        #     ax.quiver(data['x'][frame], data['y'][frame], data['z'][frame], 
-        #             projection_vector[0], projection_vector[1], projection_vector[2], 
-        #             color=colors[i], label=f'Projection on Axis {i+1}')
         
+
         # Set plot limits if needed
         ax.set_xlim([min(data['x']), max(data['x'])])
         ax.set_ylim([min(data['y']), max(data['y'])])
@@ -103,7 +119,7 @@ if __name__=="__main__":
 
     # Animate the frames
     num_frames = len(data)
-    ani = FuncAnimation(fig, update, frames=num_frames, interval=10, repeat=False,
+    ani = FuncAnimation(fig, update, frames=num_frames, interval=1, repeat=False,
                         blit=False)
 
     # If you want to save the animation to a file, uncomment the next line

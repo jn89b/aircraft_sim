@@ -46,7 +46,7 @@ if __name__=="__main__":
 
     dt = 0.01        
     t_init = 0.0
-    t_final = 5.0
+    t_final = 10
     N = int((t_final - t_init) / dt)
     print(N)
 
@@ -134,78 +134,55 @@ if __name__=="__main__":
 
         #keep last 100 frames
         frame_len = 50
+
         if frame > frame_len:
+            pos_bounds = 0.5
             x_positions = euler_states['x'][frame-frame_len:frame]
             y_positions = euler_states['y'][frame-frame_len:frame]
             z_positions = euler_states['z'][frame-frame_len:frame]
+
+            # Set axis limits based on the current frame's positions
+            ax.set_xlim(min(x_positions) - pos_bounds, max(x_positions) + pos_bounds)
+            ax.set_ylim(min(y_positions) - pos_bounds, max(y_positions) + pos_bounds)
+            ax.set_zlim(min(z_positions) - pos_bounds, max(z_positions) + pos_bounds)
         else:
-            x_positions = [euler_states['x'][frame], rk_states['x'][frame]]
-            y_positions = [euler_states['y'][frame], rk_states['y'][frame]]
-            z_positions = [-euler_states['z'][frame], -rk_states['z'][frame]]
-        # else:
+            # plot everything
+            x_positions = euler_states['x'][0:frame]
+            y_positions = euler_states['y'][0:frame]
+            z_positions = euler_states['z'][0:frame]
+
+        #modulus of the frame
+        frame = frame % frame_len
+
+        alpha_vector = np.linspace(0, 1, len(x_positions))
+        
+        # print(alpha_vector)
+        #multiply the color blue to the alpha vector
+        # color_vector = []
+        # for alpha in alpha_vector:
+        #     color_vector.append((0,0,1,alpha))
 
         # Plot the new positions for each frame
-        print("Frame: ", frame)
-        print(x_positions, y_positions, z_positions)
-        ax.plot(x_positions, y_positions, z_positions, 'o-', label='Euler and RK45')
+        ax.plot(x_positions, y_positions, z_positions, 'o-', color='b', label='Euler and RK45')
         ax.legend()
-
-        # Get heading, pitch, and roll angles for the current frame
-        heading = euler_states['psi'][frame]
-        pitch = euler_states['theta'][frame]
-        roll = euler_states['phi'][frame]
-
-        # Draw the aircraft's orientation based on heading, pitch, and roll
-        #draw_aircraft(ax, x_positions, y_positions, z_positions, heading, pitch, roll)
-
-        pos_bounds = 0.5
-        # Set axis limits based on the current frame's positions
-        ax.set_xlim(min(x_positions) - pos_bounds, max(x_positions) + pos_bounds)
-        ax.set_ylim(min(y_positions) - pos_bounds, max(y_positions) + pos_bounds)
-        ax.set_zlim(min(z_positions) - pos_bounds, max(z_positions) + pos_bounds)
-
-        # Draw the aircraft's orientation based on heading, pitch, and roll
-        #draw_aircraft(ax, euler_states['x'][frame], euler_states['y'][frame], -euler_states['z'][frame], heading, pitch, roll)
-
-    # Function to draw the aircraft orientation
-    def draw_aircraft(ax, x, y, z, heading, pitch, roll):
-        # Define aircraft body dimensions (for example)
-        body_length = 5
-        body_width = 1
-        body_height = 1
-
-        # Calculate body orientation
-        rotation_matrix = np.array([
-            [np.cos(heading) * np.cos(pitch),
-            np.cos(heading) * np.sin(pitch) * np.sin(roll) - np.sin(heading) * np.cos(roll),
-            np.cos(heading) * np.sin(pitch) * np.cos(roll) + np.sin(heading) * np.sin(roll)],
-            [np.sin(heading) * np.cos(pitch),
-            np.sin(heading) * np.sin(pitch) * np.sin(roll) + np.cos(heading) * np.cos(roll),
-            np.sin(heading) * np.sin(pitch) * np.cos(roll) - np.cos(heading) * np.sin(roll)],
-            [-np.sin(pitch),
-            np.cos(pitch) * np.sin(roll),
-            np.cos(pitch) * np.cos(roll)]
-        ])
-
-        # Define body vertices in body-fixed frame
-        body_vertices = np.array([
-            [body_length / 2, 0, 0],
-            [-body_length / 2, body_width / 2, 0],
-            [-body_length / 2, -body_width / 2, 0],
-            [-body_length / 2, -body_width / 2, -body_height],
-            [-body_length / 2, body_width / 2, -body_height],
-            [body_length / 2, 0, -body_height]
-        ])
-
-        # Rotate body vertices to world frame
-        rotated_vertices = np.dot(body_vertices, rotation_matrix.T)
-        rotated_vertices += np.array([x, y, z])  # Translate to the aircraft position
-
-        # Draw the aircraft body
-        ax.plot3D(rotated_vertices[:, 0], rotated_vertices[:, 1], rotated_vertices[:, 2], color='b')
+        
+        return ax
 
     # Create the animation
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
 
-    ani = FuncAnimation(fig, update, frames=len(euler_states), interval=1)
+    # Function to initialize the animation (blit needs this function)
+    def init():
+        # Remove the initial plot (or any other objects you want to blit)
+        # initial_plot.pop(0).remove()
+        return ax
+
+    uas_paths = []
+    uas_paths.append([x_positions, y_positions, z_positions])
+    
+    lines = ax.plot([], [], [], linewidth=2)[0] 
+                        for _ in range(len(uas_paths))
+
+    ani = FuncAnimation(fig, update, init_func=init, 
+                        frames=len(euler_states), interval=30, blit=True)
     plt.show()
