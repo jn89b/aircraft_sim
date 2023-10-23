@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.PositionVector import PositionVector
+from src.guidance_lib.src.PositionVector import PositionVector
 
 class Obstacle():
     def __init__(self, position:PositionVector, radius_m:float) -> None:

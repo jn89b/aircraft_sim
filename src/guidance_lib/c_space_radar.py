@@ -6,13 +6,15 @@ import os
 import seaborn as sns
 import pickle as pkl
 
-from src.PositionVector import PositionVector
-from src.Grid import Grid, FWAgent
-from src.Radar import Radar
-from src.Obstacle import Obstacle
-from src.SparseAstar import SparseAstar
-from src.Config.radar_config import RADAR_AIRCRAFT_HASH_FILE
-from src.DataContainer import SimDataContainer
+# how to refer to modules in src
+
+from src.guidance_lib.src.PositionVector import PositionVector
+from src.guidance_lib.src.Grid import Grid, FWAgent
+from src.guidance_lib.src.Radar import Radar
+from src.guidance_lib.src.Obstacle import Obstacle
+from src.guidance_lib.src.SparseAstar import SparseAstar
+from src.guidance_lib.src.Config.radar_config import RADAR_AIRCRAFT_HASH_FILE
+from src.guidance_lib.src.DataContainer import SimDataContainer
 
 """
 To do 
@@ -132,7 +134,9 @@ if __name__ == '__main__':
         sparse_astar.init_nodes()
         sparse_astar.update_radar_weight(weight)
         returned_path = sparse_astar.search()
+        print("returned path", returned_path)
         sparse_astar.clear_sets()
+
         paths.append(returned_path)
         
     # plot for sanity check 

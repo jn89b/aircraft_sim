@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.PositionVector import PositionVector
+from src.guidance_lib.src.PositionVector import PositionVector
 
 def fast_voxel_algo3D(x0:float, y0:float, z0:float, 
                       x1:float, y1:float, z1:float, 

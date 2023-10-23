@@ -1,7 +1,7 @@
 import numpy as np
 import math as m
-from src.PositionVector import PositionVector
-from src.Obstacle import Obstacle
+from src.guidance_lib.src.PositionVector import PositionVector
+from src.guidance_lib.src.Obstacle import Obstacle
 
 
 class FWAgent():

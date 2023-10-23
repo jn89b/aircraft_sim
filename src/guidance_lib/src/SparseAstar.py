@@ -2,8 +2,8 @@ import numpy as np
 import math as m
 from queue import PriorityQueue
 
-from src.PositionVector import PositionVector
-from src.Grid import Grid
+from src.guidance_lib.src.PositionVector import PositionVector
+from src.guidance_lib.src.Grid import Grid
 
 import time
 

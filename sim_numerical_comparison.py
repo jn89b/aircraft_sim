@@ -25,8 +25,8 @@ if __name__=="__main__":
                    'phi':0.0, 'theta':0.0, 'psi':0.0,
                    'p':0.0, 'q':0.0, 'r':0.0}
     
-    controls = {'delta_e':np.deg2rad(25), 
-                'delta_a':np.deg2rad(5), 
+    controls = {'delta_e':np.deg2rad(5), 
+                'delta_a':np.deg2rad(45), 
                 'delta_r':0.0, 
                 'delta_t':150.0}
     

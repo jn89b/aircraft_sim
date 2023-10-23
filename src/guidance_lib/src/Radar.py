@@ -1,11 +1,12 @@
 
 import numpy as np
 
-from src.PositionVector import PositionVector, rotation_z, \
+from src.guidance_lib.src.PositionVector import PositionVector, rotation_z, \
     rotation_x, rotation_y
 
-from src.Config.radar_config import radar_inputs
-from src.Raytrace import fast_voxel_algo, fast_voxel_algo3D, another_fast_voxel
+from src.guidance_lib.src.Config.radar_config import radar_inputs
+from src.guidance_lib.src.Raytrace import fast_voxel_algo, \
+    fast_voxel_algo3D, another_fast_voxel
 
 
 class Radar():

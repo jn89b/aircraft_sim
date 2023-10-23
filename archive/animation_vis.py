@@ -95,9 +95,7 @@ if __name__=="__main__":
         
         ax.quiver(data['x'][frame], data['y'][frame], data['z'][frame], 
                 inertial_vel[0], inertial_vel[1], inertial_vel[2], 
-                color='blueviolet', label='Direction Vector')
-
-        
+                color='blueviolet', label='Direction Vector')s        
 
         # Set plot limits if needed
         ax.set_xlim([min(data['x']), max(data['x'])])

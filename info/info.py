@@ -58,10 +58,9 @@ roll_list = np.arange(min_roll, max_roll+1, roll_step)
 pitch_loop = np.arange(min_pitch, max_pitch+1, 1)
 roll_loop = np.arange(min_roll, max_roll+1, 1)
 
+
+
 for yaw,pitch_roll_array in yaw_dict.items():
-    #loop though yaw keys and get array
-    # print(pitch_roll_array.shape)
-    #loop through array and get pitch and roll values
 
     # Create a 2D interpolation function
     interp_func = interpolate.interp2d(pitch_list, roll_list, 
