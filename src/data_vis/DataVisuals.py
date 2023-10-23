@@ -92,7 +92,7 @@ class DataVisualization():
         return position_list
 
 
-    def animate_local(self, interval:int=1) -> FuncAnimation:
+    def animate_local(self, interval:int=1, save:bool=False) -> FuncAnimation:
         # Create the animation
         fig, self.ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
 
@@ -102,8 +102,14 @@ class DataVisualization():
         #set background color to black
         fig.patch.set_facecolor((0.529, 0.808, 0.922))
 
-        ani = FuncAnimation(fig, self.update_local, frames=len(self.data), interval=interval)
+        ani = FuncAnimation(fig, self.update_local, frames=len(self.data),
+                             interval=interval)
 
+        #if save is true, save the animation as a gif
+        if save == True:
+            print("saving gif")
+            ani.save('local_animation.gif', writer='imagemagick', fps=30)
+            print("done saving gif")
         # plt.show()
         return ani 
 
@@ -143,7 +149,7 @@ class DataVisualization():
                 [self.data['z'][frame], self.data['back_fuselage_z'][frame]], 
                 color='red', linestyle='-.')
         
-
+        
         # Plot body frame direction vector (assuming unit vectors for simplicity)
         body_frame_vector = np.array([self.data['u'][frame], self.data['v'][frame], self.data['w'][frame]])
 
@@ -193,7 +199,7 @@ class DataVisualization():
 
 
 
-    def animate_global(self) -> FuncAnimation:
+    def animate_global(self, save:bool=False) -> FuncAnimation:
         """
         Animate global position 
         """
@@ -241,8 +247,72 @@ class DataVisualization():
             # i = (2 * i) % x_t.shape[0]
 
             # for line, pt, xi in zip(lines, pts, x_t):
-            time_span = len(self.data)
+            frame = i
+            time_span = 10 # len(self.data)
             alpha_vec = np.linspace(0, 1, time_span)
+
+
+
+            self.ax1.scatter(self.data['x'][frame], 
+                            self.data['y'][frame], 
+                            self.data['z'][frame], color='b', label='Position')
+            
+            #draw a quiver from the aircraft position to the right wing
+            self.ax1.quiver(self.data['x'][frame], self.data['y'][frame], self.data['z'][frame],
+                    self.data['x'][frame] - self.data['right_wing_x'][frame],
+                    self.data['y'][frame] - self.data['right_wing_y'][frame],
+                    self.data['z'][frame] - self.data['right_wing_z'][frame],
+                    color='green', label='Right Wing')
+            
+            #draw a quiver from the aircraft position to the left wing
+            self.ax1.quiver(self.data['x'][frame], self.data['y'][frame], self.data['z'][frame],
+                    self.data['x'][frame] - self.data['left_wing_x'][frame],
+                    self.data['y'][frame] - self.data['left_wing_y'][frame],
+                    self.data['z'][frame] - self.data['left_wing_z'][frame],
+                    color='green', linestyle='--')
+            
+            #do the front and back of the aircraft
+            #draw a quiver from the aircraft position to the front
+            self.ax1.quiver(self.data['x'][frame], self.data['y'][frame], self.data['z'][frame],
+                    self.data['front_fuselage_x'][frame] - self.data['x'][frame], 
+                    self.data['front_fuselage_y'][frame] - self.data['y'][frame], 
+                    self.data['front_fuselage_z'][frame] - self.data['z'][frame], 
+                    color='red', label='Front')
+            
+            #draw a quiver from the aircraft position to the back
+            #plot without the quiver
+            self.ax1.plot([self.data['x'][frame], self.data['back_fuselage_x'][frame]], 
+                    [self.data['y'][frame], self.data['back_fuselage_y'][frame]], 
+                    [self.data['z'][frame], self.data['back_fuselage_z'][frame]], 
+                    color='red', linestyle='-.')
+            
+            
+            # Plot body frame direction vector (assuming unit vectors for simplicity)
+            body_frame_vector = np.array([self.data['u'][frame], self.data['v'][frame], self.data['w'][frame]])
+
+            # Compute the inertial frame direction vector
+            dcm_body_to_inertial = euler_dcm_body_to_inertial(self.data['phi'][frame], 
+                                                            self.data['theta'][frame], 
+                                                            self.data['psi'][frame])
+
+
+            # set plot limits based on the current frame's positions
+            if self.fuselage_length >= self.wing_span:
+                max_length = self.fuselage_length
+            else:
+                max_length = self.wing_span
+
+
+            inertial_vel = dcm_body_to_inertial @ body_frame_vector
+            #normalize inertial vel
+            inertial_vel = inertial_vel / np.linalg.norm(inertial_vel)
+            inertial_vel = inertial_vel * max_length 
+            
+
+            self.ax1.quiver(self.data['x'][frame], self.data['y'][frame], self.data['z'][frame], 
+                    inertial_vel[0], inertial_vel[1], inertial_vel[2], 
+                    color='blueviolet', label='Direction Vector')
+
 
             for j, (line,pt) in enumerate(zip(lines,pts)):
             # for j, (line,pt) in enumerate(zip(self.lines,self.pts)):
@@ -258,9 +328,10 @@ class DataVisualization():
                 else:
                     interval = i - time_span
                 
+
                 #set lines 
-                # line.set_data(x_list[j][interval:i], y_list[j][interval:i])
-                # line.set_3d_properties(z_list[j][interval:i])
+                line.set_data(x_list[j][interval:i], y_list[j][interval:i])
+                line.set_3d_properties(z_list[j][interval:i])
 
                 # # # #set points
 
@@ -286,8 +357,11 @@ class DataVisualization():
             return lines + pts
         
         num_frames = len(self.data)
-        ani = FuncAnimation(fig1, update, frames=num_frames, interval=1, repeat=False,
+        ani = FuncAnimation(fig1, update, frames=num_frames, interval=1, repeat=True,
                             init_func=init, blit=True)
+        
+        if save:
+            ani.save('global_animation.gif', writer='imagemagick', fps=30)
         
         return ani
 
