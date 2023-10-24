@@ -28,7 +28,7 @@ Have some obstacles placed within range
 import plotly.graph_objects as go
 import plotly.express as px
 import pickle as pkl
-
+import pandas as pd
 
 sns.set_palette("colorblind")
 
@@ -42,12 +42,79 @@ def load_pickle():
     return loaded_data
 
 
+def return_planner_states(self, states:list) ->pd.DataFrame:
+    x = [state[0] for state in states]
+    y = [state[1] for state in states]
+    z = [state[2] for state in states]
+    theta_dg = [state[3] for state in states]
+    phi_dg = [state[4] for state in states]
+    psi_dg = [state[5] for state in states]
+
+    #return a dataframe
+    planner_states = pd.DataFrame({'x':x, 'y':y, 'z':z, 
+                                   'theta_dg':theta_dg, 
+                                   'phi_dg':phi_dg, 
+                                   'psi_dg':psi_dg})
+
+    return planner_states
+
 if __name__ == '__main__':
 
     #load simple sim
+    start_position = PositionVector(10,60,5)
+    goal_position = PositionVector(110,110, 15)
+    fw_agent_psi_dg = 90
+    fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
+    fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
+                                 max_climb_angle_dg=5)
+    fw_agent.leg_m = 30
+
+    fw_agent.set_goal_state(goal_position)
+
+    ## create grid
+    grid = Grid(fw_agent, 120, 120, 100, 5, 5, 0)
+    
+    # obs_positions = [(40,60,10)]
+
+    #set random seed
+    np.random.seed(1)
+    obs_positions = []
+    for i in range(15):
+        x = np.random.randint(0, 120)
+        y = np.random.randint(0, 120)
+        z = np.random.randint(0, 100)
+
+        obs_positions.append((x,y,z))
+
+    obs_list = []
+    for pos in obs_positions:
+        obs_position = PositionVector(pos[0], pos[1], pos[2])
+        radius_obs_m = 5
+        some_obstacle = Obstacle(obs_position, radius_obs_m)
+        obs_list.append(some_obstacle)
+        grid.insert_obstacles(some_obstacle)
+    
+    sparse_astar = SparseAstar(grid)
+    sparse_astar.init_nodes()
+    path = sparse_astar.search()
+
+    planner_states = return_planner_states(sparse_astar, path)
+    print(planner_states)
+    #save planner 
+    planner_states.to_csv("planner_states.csv", index=False)
+
+    #plot in 2D
+    fig, ax = plt.subplots()
+    ax.plot(planner_states['x'], planner_states['y'], 'o-')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+
+    #plot obstacles
+    for obs in obs_list:
+        circle = plt.Circle((obs.position.x, obs.position.y), obs.radius_m, color='r')
+        ax.add_artist(circle)
+
+    plt.show()
     
 
-    
-
-    
     

@@ -21,12 +21,12 @@ if __name__=="__main__":
     airplane_params = get_airplane_params(df)
     
     init_states = {'x':0.0, 'y':0.0, 'z':0.0,
-                   'u':0.0, 'v':0.0, 'w':0.0,
+                   'u':25.0, 'v':0.0, 'w':0.0,
                    'phi':0.0, 'theta':0.0, 'psi':0.0,
                    'p':0.0, 'q':0.0, 'r':0.0}
     
-    controls = {'delta_e':np.deg2rad(5), 
-                'delta_a':np.deg2rad(45), 
+    controls = {'delta_e':np.deg2rad(20), 
+                'delta_a':np.deg2rad(25), 
                 'delta_r':0.0, 
                 'delta_t':150.0}
     
@@ -46,7 +46,7 @@ if __name__=="__main__":
 
     dt = 0.01        
     t_init = 0.0
-    t_final = 10
+    t_final = 5
     N = int((t_final - t_init) / dt)
     print(N)
 

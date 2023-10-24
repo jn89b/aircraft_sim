@@ -481,6 +481,7 @@ class AircraftCasadi():
             self.p, self.q, self.r)
         
         self.num_states = self.states.size()[0]
+        self.n_states = self.num_states
 
     def define_controls(self):
         self.delta_a = ca.MX.sym('delta_a') # Aileron
@@ -495,6 +496,7 @@ class AircraftCasadi():
             self.delta_t)
         
         self.num_controls = self.controls.size()[0]
+        self.n_controls = self.num_controls
 
     def compute_aoa(self) -> ca.MX:
         # Compute the angle of attack

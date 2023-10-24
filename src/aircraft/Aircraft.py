@@ -69,7 +69,7 @@ class AircraftInfo():
         self.delta_t = None
         
         self.states = self.init_states(aircraft_init_states)
-        self.controls = self.init_controls(aircraft_init_controls)
+        # self.controls = self.init_controls(aircraft_init_controls)
         self.rho = 1.225 #kg/m^3
 
 

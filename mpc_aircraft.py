@@ -432,15 +432,15 @@ if __name__=="__main__":
 
     f = aircraft.set_state_space()
 
-    init_x = 0
-    init_y = 0
-    init_z = 0
+    init_x = 10
+    init_y = 60
+    init_z = 5
     init_u = 25
     init_v = 0
     init_w = 0
     init_phi = 0
-    init_theta = 0
-    init_psi = 0
+    init_theta = np.deg2rad(-5)
+    init_psi = np.deg2rad(38)
     init_p = 0
     init_q = 0
     init_r = 0
@@ -450,9 +450,12 @@ if __name__=="__main__":
     init_rud = 0
     init_throttle = 30
 
-    goal_x = 50
-    goal_y = 50
-    goal_z = -10
+    goal_x = 31
+    goal_y = 81
+    goal_z = 6  
+    goal_phi = np.deg2rad(-21)
+    goal_theta = np.deg2rad(0)
+    goal_psi = np.deg2rad(45)
 
     states = np.array([
         init_x, init_y, init_z,
@@ -467,17 +470,18 @@ if __name__=="__main__":
     min_phi = np.deg2rad(-45)
     max_theta = np.deg2rad(25)
     min_theta = np.deg2rad(-25)
-
+    min_vel = 15
+    max_vel = 30
 
     #set the control surface limits
     max_control_surface = np.deg2rad(25)
     min_control_surface = np.deg2rad(-25)
-    min_throttle = 5 # Newtons
+    min_throttle = 20 # Newtons
     max_throttle = 200 # Newtons
 
     # Optimal control problem
     opti = ca.Opti()
-    dt = 0.1 # Time step
+    dt = 0.01 # Time step
     N = 30
     t_init = 0 # Initial time
 
@@ -511,9 +515,10 @@ if __name__=="__main__":
 
     # set constraints
     #set the max and min values for the states
+    opti.subject_to(opti.bounded(min_vel, X[3,:], max_vel))
     opti.subject_to(opti.bounded(min_phi, X[6,:], max_phi))
     opti.subject_to(opti.bounded(min_theta, X[7,:], max_theta))
-
+    
     #aileron
     opti.subject_to(opti.bounded(min_control_surface, U[0,:], max_control_surface))
     #elevator
@@ -526,12 +531,12 @@ if __name__=="__main__":
     # set cost function 
     # minimize the error between the final state and the goal state
     #set weights for the cost function as a array
-    weights = np.array([1, 1, 1, 
+    weights = np.array([1.0, 1.0, 1.0, 
                         0, 0, 0,
-                        0, 0, 0, 
+                        0, 0, 0.5, 
                         0, 0, 0])
     
-    weights_controls = np.array([0, 0, 0, 0])
+    weights_controls = np.array([0.5, 0.5, 0.5, 0.5])
 
     #set the cost function to minimize error and the control inputs
     # state_error = weights*ca.sumsqr((X[:, -1] - xF))
@@ -554,7 +559,7 @@ if __name__=="__main__":
     # solve the optimization problem
     opts = {
         'ipopt': {
-            'max_iter': 100,
+            'max_iter': 2000,
             'print_level': 2,
             'acceptable_tol': 1e-2,
             'acceptable_obj_change_tol': 1e-2,
@@ -562,11 +567,13 @@ if __name__=="__main__":
         },
         'print_time': 1
     }
-    opti.solver('ipopt', opts)#, {'ipopt': {'print_level': 0}})
 
+
+    opti.solver('ipopt', opts)#, {'ipopt': {'print_level': 0}})
 
     #Initial Trajectory    
     sol = opti.solve()    
+    print("Opti solver", opti)
     print(sol.value(X))
     #debugging
     opti.debug.value(X)
@@ -584,11 +591,12 @@ if __name__=="__main__":
     #plot starting and ending points
     ax.scatter(sol.value(X[0,0]), sol.value(X[1,0]), 
                -sol.value(X[2,0]), c='r', marker='o', label='start')
-    ax.scatter(sol.value(X[0,-1]), sol.value(X[1,-1]), 
-               -sol.value(X[2,-1]), c='g', marker='o', label='end')
+    # ax.scatter(sol.value(X[0,-1]), sol.value(X[1,-1]), 
+    #            -sol.value(X[2,-1]), c='c', marker='o', label='end')
 
     #plot the goal
-    ax.scatter(goal_x, goal_y, -goal_z, c='b', marker='o', label='goal')
+    print("goal", goal_x, goal_y, goal_z)
+    ax.scatter(goal_x, goal_y, -goal_z, c='g', marker='x', label='goal')
 
     #set axis equal
     max_range = np.array([sol.value(X[0,:]).max()-sol.value(X[0,:]).min(), sol.value(X[1,:]).max()-sol.value(X[1,:]).min(), sol.value(X[2,:]).max()-sol.value(X[2,:]).min()]).max() / 2.0
@@ -596,8 +604,8 @@ if __name__=="__main__":
     mean_y = sol.value(X[1,:]).mean()
     mean_z = sol.value(X[2,:]).mean()
     max_z_range = np.array([sol.value(X[2,:]).max()-sol.value(X[2,:]).min()]).max() / 2.0
-    ax.set_xlim(mean_x - max_range, mean_x + max_range)
-    ax.set_ylim(mean_y - max_range, mean_y + max_range)
+    # ax.set_xlim(mean_x - max_range, mean_x + max_range)
+    # ax.set_ylim(mean_y - max_range, mean_y + max_range)
     # ax.set_zlim(mean_z - max_z_range, mean_z + 30)
     ax.legend()
 
@@ -634,6 +642,16 @@ if __name__=="__main__":
     axs[2].set_ylabel('w [m/s]')
     axs[2].set_xlabel('Time [s]')
     
+    #plot control inputs in subplots
+    fig, axs = plt.subplots(3,1)
+    axs[0].plot(t_vec, np.rad2deg(sol.value(X[9,:])))
+    axs[0].set_ylabel('p [deg/s]')
+    axs[1].plot(t_vec, np.rad2deg(sol.value(X[10,:])))
+    axs[1].set_ylabel('q [deg/s]')
+    axs[2].plot(t_vec, np.rad2deg(sol.value(X[11,:])))
+    axs[2].set_ylabel('r [deg/s]')
+
+
     plt.show()
 
 
