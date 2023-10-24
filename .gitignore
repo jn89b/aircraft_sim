@@ -5,3 +5,5 @@ global-exclude *.pyc
 global-exclude __pycache__
 
 **/__pycache__/
+
+*/__pycache__/*
