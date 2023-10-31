@@ -157,13 +157,13 @@ class ModelPredictiveControl():
         # solve the optimization problem
         solver_opts = {
             'ipopt': {
-                'max_iter': 2000,
+                'max_iter': 1000,
                 'print_level': 2,
                 'acceptable_tol': 1e-2,
                 'acceptable_obj_change_tol': 1e-2,
                 'hessian_approximation': 'limited-memory',  # Set Hessian approximation method here
             },
-            'print_time': 1
+            'print_time': 0
         }
 
         #create solver
@@ -173,8 +173,6 @@ class ModelPredictiveControl():
     def reinitStartGoal(self, start, goal):
         self.state_init = ca.DM(start)   # initial state
         self.state_target = ca.DM(goal)  # target state
-        print("length of state_init: ", len(start))
-        print("length of state_target: ", len(goal))
 
     # def moveObstacle(self, x, y):
     #     """move obstacle to new position"""
@@ -261,7 +259,6 @@ class ModelPredictiveControl():
             ubg[self.n_states*self.N+n_states:] = -Config.BUFFER_DISTANCE
 
         else:
-            print("not avoiding")
             lbg = ca.DM.zeros((self.n_states*(self.N+1), 1))
             ubg  =  ca.DM.zeros((self.n_states*(self.N+1), 1))
 
@@ -293,8 +290,6 @@ class ModelPredictiveControl():
             ubg=args['ubg'],
             p=args['p']
         )
-
-        print(self.solver)
 
         #unpack as a matrix
         self.u = ca.reshape(self.sol['x'][self.n_states * (self.N + 1):], 

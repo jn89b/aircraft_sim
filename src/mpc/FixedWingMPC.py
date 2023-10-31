@@ -23,9 +23,13 @@ class FixedWingMPC(ModelPredictiveControl):
         self.lbx['U'][3, :] = self.airplane_params['delta_t_min']
         self.ubx['U'][3, :] = self.airplane_params['delta_t_max']
 
+        self.lbx['X'][2, :] = self.airplane_params['z_min']
+        self.ubx['X'][2, :] = self.airplane_params['z_max']
+
         self.lbx['X'][3, :] = self.airplane_params['u_min']
         self.ubx['X'][3, :] = self.airplane_params['u_max']
 
+        
         # self.lbx['X'][4, :] = self.airplane_params['v_min']
         # self.ubx['X'][4, :] = self.airplane_params['v_max']
 
@@ -41,14 +45,14 @@ class FixedWingMPC(ModelPredictiveControl):
         # self.lbx['X'][8, :] = self.airplane_params['psi_min']
         # self.ubx['X'][8, :] = self.airplane_params['psi_max']
 
-        # self.lbx['X'][9, :] = self.airplane_params['p_min']
-        # self.ubx['X'][9, :] = self.airplane_params['p_max']
+        self.lbx['X'][9, :] = self.airplane_params['p_min']
+        self.ubx['X'][9, :] = self.airplane_params['p_max']
 
-        # self.lbx['X'][10, :] = self.airplane_params['q_min']
-        # self.ubx['X'][10, :] = self.airplane_params['q_max']
+        self.lbx['X'][10, :] = self.airplane_params['q_min']
+        self.ubx['X'][10, :] = self.airplane_params['q_max']
 
-        # self.lbx['X'][11, :] = self.airplane_params['r_min']
-        # self.ubx['X'][11, :] = self.airplane_params['r_max']
+        self.lbx['X'][11, :] = self.airplane_params['r_min']
+        self.ubx['X'][11, :] = self.airplane_params['r_max']
 
     def unpack_controls(self, u:ca.DM) -> dict:
         """

@@ -10,9 +10,11 @@ from src.Utils import get_airplane_params
 
 
 """
+
 Just evaluating the numerical approximations between the using 
 Euler's method and Runge-Kutta 4th order method.
 """
+
 
 if __name__=="__main__":
     #check if csv file exists
@@ -155,7 +157,6 @@ if __name__=="__main__":
         frame = frame % frame_len
 
         alpha_vector = np.linspace(0, 1, len(x_positions))
-        
         # print(alpha_vector)
         #multiply the color blue to the alpha vector
         # color_vector = []

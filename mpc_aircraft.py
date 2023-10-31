@@ -450,9 +450,9 @@ if __name__=="__main__":
     init_rud = 0
     init_throttle = 30
 
-    goal_x = 31
-    goal_y = 81
-    goal_z = 6  
+    goal_x = 95
+    goal_y = 105
+    goal_z = 7
     goal_phi = np.deg2rad(-21)
     goal_theta = np.deg2rad(0)
     goal_psi = np.deg2rad(45)
