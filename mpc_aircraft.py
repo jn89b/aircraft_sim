@@ -452,7 +452,7 @@ if __name__=="__main__":
 
     goal_x = 95
     goal_y = 105
-    goal_z = 7
+    goal_z = -7
     goal_phi = np.deg2rad(-21)
     goal_theta = np.deg2rad(0)
     goal_psi = np.deg2rad(45)
@@ -481,8 +481,8 @@ if __name__=="__main__":
 
     # Optimal control problem
     opti = ca.Opti()
-    dt = 0.01 # Time step
-    N = 30
+    dt = 1/1200 # Time step
+    N = 100
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem

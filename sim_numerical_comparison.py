@@ -27,8 +27,9 @@ if __name__=="__main__":
                    'phi':0.0, 'theta':0.0, 'psi':0.0,
                    'p':0.0, 'q':0.0, 'r':0.0}
     
-    controls = {'delta_e':np.deg2rad(20), 
-                'delta_a':np.deg2rad(25), 
+    #a negatitive elevator command makes it go up 
+    controls = {'delta_e':-np.deg2rad(20), 
+                'delta_a':np.deg2rad(0.0), 
                 'delta_r':0.0, 
                 'delta_t':150.0}
     
@@ -46,7 +47,7 @@ if __name__=="__main__":
     aircraft_dynamics_eulers = AircraftDynamics(aircraft_info_euler)
     aircraft_dynamics_rk = AircraftDynamics(aircraft_info_rk)
 
-    dt = 0.01        
+    dt = 1/1200        
     t_init = 0.0
     t_final = 5
     N = int((t_final - t_init) / dt)
@@ -82,6 +83,7 @@ if __name__=="__main__":
             aircraft_info_rk.states,
             dt
         )
+        
         aircraft_info_rk.update_states(new_states_rk)
 
 

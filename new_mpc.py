@@ -8,6 +8,7 @@ from matplotlib.animation import FuncAnimation
 from src.mpc.FixedWingMPC import FixedWingMPC
 from src.aircraft.AircraftDynamics import AircraftCasadi
 from src.Utils import get_airplane_params
+from src.data_vis.DataVisuals import DataVisualization
 
 from src.aircraft.AircraftDynamics import AircraftDynamics
 from src.aircraft.Aircraft import AircraftInfo
@@ -23,26 +24,24 @@ if __name__=="__main__":
     mpc_constraints = {
         'delta_a_max': np.deg2rad(25),
         'delta_a_min': np.deg2rad(-25),
-        'delta_e_max': np.deg2rad(15),
-        'delta_e_min': np.deg2rad(-15),
+        'delta_e_max': np.deg2rad(25),
+        'delta_e_min': np.deg2rad(-25),
         'delta_r_max': np.deg2rad(25),
         'delta_r_min': np.deg2rad(-25),
-        'delta_t_max': 200, #newtons
-        'delta_t_min': 100, #newtons
-        'z_max': 8, #m
-        'z_min': 0, #m
+        'delta_t_max': 300, #newtons
+        'delta_t_min': 15, #newtons
+        'z_max': 20, #m
+        'z_min': -20, #m
         'u_max': 25.0, #m/s
-        'u_min': 16.0, #m/s
+        'u_min': 15.0, #m/s
         'v_max': 5, #m/s
         'v_min': -5, #m/s
         'w_max': -2, #m/s
         'w_min':  2, #m/s
-        'phi_max': np.deg2rad(65), #rad
-        'phi_min': np.deg2rad(-65), #rad
-        'theta_max': np.deg2rad(5), #rad
-        'theta_min': np.deg2rad(-5), #ra
-        # 'psi_max': np.deg2rad(45), #rad
-        # 'psi_min': np.deg2rad(-45), #rad
+        'phi_max': np.deg2rad(45), #rad
+        'phi_min': np.deg2rad(-45), #rad
+        'theta_max': np.deg2rad(25), #rad
+        'theta_min': np.deg2rad(-25), #rad
         'p_max': np.deg2rad(90), #rad/s
         'p_min': np.deg2rad(-90), #rad/s
         'q_max': np.deg2rad(90), #rad/s
@@ -52,21 +51,20 @@ if __name__=="__main__":
     }
 
     #create a diagonal matrix for the weights
-    Q = ca.diag([1.0,1.0,0.1, #position
+    Q = ca.diag([1.0,1.0,0.5, #position
                  0.0,0.0,0.0, #velocity body
-                 5.0,5.0,5.0, #euler angles
+                 5.0,10.0,5.0, #euler angles
                  0,0,0]) #angular rates body
-    print()
 
-    R = ca.diag([5.0,
-                 5.0,
+    R = ca.diag([2.0,
+                 2.0,
                  2.0,
                  2.0]) #control inputs
 
     mpc_params = {
         'model': aircraft_ca,
-        'dt_val': 0.01,
-        'N': 30,
+        'dt_val': 1/1200,
+        'N': 5,
         'Q': Q,
         'R': R
     }
@@ -85,9 +83,17 @@ if __name__=="__main__":
     init_u = 25
     init_v = 0
     init_w = 0
-    init_phi = np.deg2rad(planner_states['phi_dg'][0])
-    init_theta = np.deg2rad(planner_states['theta_dg'][0])
-    init_psi = np.deg2rad(30)#np.deg2rad(planner_states['psi_dg'][0])
+    
+    init_psi = np.arctan2(planner_states['y'][1] - planner_states['y'][0], 
+                                     planner_states['x'][1] - planner_states['x'][0])
+    init_phi = 0.0
+    init_theta = 0.0 
+    
+    print("initial heading" , np.rad2deg(init_psi))    
+    init_theta = np.arctan2(planner_states['z'][1] - planner_states['z'][0],
+                            np.sqrt((planner_states['x'][1] - planner_states['x'][0])**2 + \
+                            planner_states['y'][1] - planner_states['y'][0])**2)
+    
     init_p = 0
     init_q = 0
     init_r = 0
@@ -97,6 +103,7 @@ if __name__=="__main__":
     init_rud = 0
     init_throttle = 40
 
+    #load up planner states
     goal_x = planner_states['x'][idx_goal]
     goal_y = planner_states['y'][idx_goal]
     goal_z = planner_states['z'][idx_goal]  
@@ -104,7 +111,7 @@ if __name__=="__main__":
     goal_v = 0
     goal_w = 0
     goal_phi = np.deg2rad(planner_states['phi_dg'][idx_goal])
-    goal_theta = -np.deg2rad(planner_states['theta_dg'][idx_goal])
+    goal_theta = np.deg2rad(planner_states['theta_dg'][idx_goal])
     goal_psi = np.deg2rad(planner_states['psi_dg'][idx_goal])
     goal_p = 0
     goal_q = 0
@@ -156,7 +163,7 @@ if __name__=="__main__":
 
     tolerance = 5
 
-    max_iter = 50
+    max_iter = 1000
     counter = 0
 
     rk_states = []
@@ -166,7 +173,7 @@ if __name__=="__main__":
     print("rest_waypoints: ", rest_waypoints)
     wp_max = len(rest_waypoints)
     
-    for wp in rest_waypoints.iterrows():
+    for i, wp in enumerate(rest_waypoints.iterrows()):
         #compute distance error 
         current_states = aircraft_info.get_states()
         current_x = current_states[0]
@@ -174,17 +181,26 @@ if __name__=="__main__":
         current_z = current_states[2]
         goal_x = wp[1]['x']
         goal_y = wp[1]['y']
-        goal_z = wp[1]['z']
-        # goal_phi = np.deg2rad(wp[1]['phi_dg'])
-        # goal_theta = np.deg2rad(wp[1]['theta_dg'])
-        # goal_psi = np.deg2rad(wp[1]['psi_dg'])
-        goal_phi = 0.0
-        goal_theta = 0.0
-        #goal_psi = np.deg2rad(wp[1]['psi_dg'])
-        goal_theta = -np.arctan2(goal_z - current_z, np.sqrt((goal_x - current_x)**2 + (goal_y - current_y)**2))
-        goal_psi = np.arctan2(goal_y - current_y, goal_x - current_x)
+        goal_z = wp[1]['z']        
+        
+        if i == 0:
+            goal_theta = np.arctan2(wp[1]['z'] - \
+                current_z, np.sqrt((wp[1]['x'] - current_x)**2 + (wp[1]['y'] - current_y)**2))
+            
+            goal_psi = np.arctan2(wp[1]['y'] - current_y,
+                                  wp[1]['x'] - current_x)
+        else:        
+            prev_wp = rest_waypoints.iloc[i-1]
+            goal_theta = np.arctan2(wp[1]['z'] - \
+                prev_wp['z'], np.sqrt((wp[1]['x'] - prev_wp['x'])**2 + (wp[1]['y'] - prev_wp['y'])**2))
+            goal_psi = np.arctan2(wp[1]['y'] - prev_wp['y'],
+                                    wp[1]['x'] - prev_wp['x'])
+            
         wp[1]['theta_dg'] = np.rad2deg(goal_theta)
-        wp[1]['psi_dg'] = np.rad2deg(goal_psi)
+        wp[1]['psi_dg']   = np.rad2deg(goal_psi)
+        
+        print("goal_theta", np.rad2deg(goal_theta))
+        print("goal_psi", np.rad2deg(goal_psi))
 
         goal_states = np.array([goal_x, goal_y, goal_z,
                                 goal_u, goal_v, goal_w,
@@ -192,7 +208,12 @@ if __name__=="__main__":
                                 goal_p, goal_q, goal_r])
         
 
+        if counter >= max_iter:
+            break
+        
         print("New goal location: ", goal_x, goal_y, goal_z)
+        #print("wp percent", float(i/wp_max)*100)
+        print("waypoint index", 1 + i) #added 1 since we start off the start
 
         error_x = goal_x - current_x
         error_y = goal_y - current_y
@@ -201,7 +222,6 @@ if __name__=="__main__":
         error_mag = np.sqrt(error_x**2 + error_y**2 + error_z**2)
 
         while error_mag >= tolerance and counter <= max_iter:    
-            print("counter: ", counter)
 
             if error_mag <= tolerance:
                 print("Reached error_mag: ", error_mag)
@@ -253,7 +273,6 @@ if __name__=="__main__":
                                     phi, theta, psi, 
                                     p, q, r])
 
-
                 #compute error between planner and simulator
                 aircraft_info.update_states(new_states)
                 rk_states.append(new_states)
@@ -291,8 +310,8 @@ if __name__=="__main__":
                                         init_rud, 
                                         init_throttle])
 
-                print("error_mag: ", error_mag)
-                print("difference: ", error_mag - old_error_mag)
+                # print("error_mag: ", error_mag)
+                # print("difference: ", error_mag - old_error_mag)
 
                 if error_mag <= tolerance:
                     print("Reached error_mag: ", error_mag)
@@ -304,7 +323,6 @@ if __name__=="__main__":
 
             counter += 1
             # print("counter: ", counter)
-
 
     #%%
     # plot in 2D
@@ -331,7 +349,7 @@ if __name__=="__main__":
         ax.quiver3D(wp['x'], wp['y'], wp['z'],
                     np.cos(np.deg2rad(wp['psi_dg'])),
                     np.sin(np.deg2rad(wp['psi_dg'])),
-                    0, length=10, color='k')
+                    np.sin(np.deg2rad(wp['theta_dg'])), length=10, color='k')
 
     # for wp, planner_states.iterrows:
     #     ax.quiver3D(wp[1]['x'], wp[1]['y'], wp[1]['z'],
@@ -339,10 +357,6 @@ if __name__=="__main__":
     #                 np.sin(np.deg2rad(wp[1]['psi_dg'])),
     #                 0, length=5)
     
-
-    
-
-
     #plot the state_dict
     ax.plot(state_dict['x'], 
             state_dict['y'], 
@@ -350,10 +364,8 @@ if __name__=="__main__":
     ax.legend()
 
     #set z axis limits
-    ax.set_zlim(0, 30)
-
-
-
+    #ax.set_zlim(0, 30)
+    
     #plot velocities in a subplot
     fig, ax = plt.subplots(3,1, sharex=True)
     ax[0].plot(rk_states['u'], label='u')
@@ -389,4 +401,10 @@ if __name__=="__main__":
     ax[3].plot(rk_controls['delta_t'], label='delta_t')
     ax[3].set_ylabel('delta_t (N)')
 
+    #visualize 
+    data_vis = DataVisualization(rk_states, 5)
+    ani = data_vis.animate_local(interval=20)
+    ani_2 = data_vis.animate_global()    
     plt.show()
+    
+    

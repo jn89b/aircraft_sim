@@ -149,15 +149,15 @@ class DataVisualization():
                 [self.data['z'][frame], self.data['back_fuselage_z'][frame]], 
                 color='red', linestyle='-.')
         
-        
         # Plot body frame direction vector (assuming unit vectors for simplicity)
-        body_frame_vector = np.array([self.data['u'][frame], self.data['v'][frame], self.data['w'][frame]])
+        body_frame_vector = np.array([self.data['u'][frame], 
+                                      self.data['v'][frame], 
+                                      self.data['w'][frame]])
 
         # Compute the inertial frame direction vector
         dcm_body_to_inertial = euler_dcm_body_to_inertial(self.data['phi'][frame], 
                                                           self.data['theta'][frame], 
                                                           self.data['psi'][frame])
-
 
         # set plot limits based on the current frame's positions
         if self.fuselage_length >= self.wing_span:
@@ -183,9 +183,10 @@ class DataVisualization():
 
         self.ax.grid(color='white', linestyle='-', linewidth=0.5)
 
-        self.ax.set_xlim(current_x - max_length, current_x + max_length)
-        self.ax.set_ylim(current_y - max_length, current_y + max_length)
-        self.ax.set_zlim(current_z - max_length, current_z + max_length)
+        span = 15
+        self.ax.set_xlim(current_x - (max_length + span), current_x + (max_length + span))
+        self.ax.set_ylim(current_y - (max_length + span), current_y + (max_length + span))
+        self.ax.set_zlim(current_z - (max_length + 0), current_z + (max_length + 0))
 
         # self.draw_aircraft_body(frame)
         self.ax.set_xlabel('X')
@@ -196,7 +197,6 @@ class DataVisualization():
         
         #set the legend outside the plot
         self.ax.legend(bbox_to_anchor=(1.0,1), loc="upper right")
-
 
 
     def animate_global(self, save:bool=False) -> FuncAnimation:
@@ -248,7 +248,7 @@ class DataVisualization():
 
             # for line, pt, xi in zip(lines, pts, x_t):
             frame = i
-            time_span = 10 # len(self.data)
+            time_span = 100 # len(self.data)
             alpha_vec = np.linspace(0, 1, time_span)
 
 
@@ -315,13 +315,6 @@ class DataVisualization():
 
 
             for j, (line,pt) in enumerate(zip(lines,pts)):
-            # for j, (line,pt) in enumerate(zip(self.lines,self.pts)):
-                
-                #check if out of bounds
-                # if self.x_list[j][i] <= self.x_bounds[0] or \
-                #     self.x_list[j][i] >= self.x_bounds[1]:
-                #         print("out of bounds", self.x_list[j][i])
-                #         continue
                 
                 if i < time_span:
                     interval = 0
