@@ -407,4 +407,3 @@ if __name__=="__main__":
     ani_2 = data_vis.animate_global()    
     plt.show()
     
-    

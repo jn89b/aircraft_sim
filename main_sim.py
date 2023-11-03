@@ -51,30 +51,30 @@ if __name__ == "__main__":
         'phi_min': np.deg2rad(-45), #rad
         'theta_max': np.deg2rad(25), #rad
         'theta_min': np.deg2rad(-25), #rad
-        'p_max': np.deg2rad(90), #rad/s
-        'p_min': np.deg2rad(-90), #rad/s
-        'q_max': np.deg2rad(90), #rad/s
-        'q_min': np.deg2rad(-90), #rad/s
-        'r_max': np.deg2rad(90), #rad/s
-        'r_min': np.deg2rad(-90), #rad/s
+        'p_max': np.deg2rad(45), #rad/s
+        'p_min': np.deg2rad(-45), #rad/s
+        'q_max': np.deg2rad(20), #rad/s
+        'q_min': np.deg2rad(-20), #rad/s
+        'r_max': np.deg2rad(45), #rad/s
+        'r_min': np.deg2rad(-45), #rad/s
     }
 
     #create a diagonal matrix for the weights
-    Q = ca.diag([1.0,1.0,0.75, #position
+    Q = ca.diag([1.0,1.0,0.7, #position
                  0.0,0.0,0.0, #velocity body
-                 5.0,2.5,5.0, #euler angles
+                 1.0,1.0,1.0, #euler angles
                  0,0,0]) #angular rates body
 
-    R = ca.diag([2.0,
-                 2.0,
-                 2.0,
-                 2.0]) #control inputs
+    R = ca.diag([1.0,
+                 1.0,
+                 1.0,
+                 1.0]) #control inputs
 
-    mpc_freq = 50
+    mpc_freq = 100
     mpc_params = {
         'model': aircraft_ca,
-        'dt_val': 1/mpc_freq,
-        'N': 10,
+        'dt_val': 0.001,
+        'N': 30,
         'Q': Q,
         'R': R
     }
@@ -164,63 +164,106 @@ if __name__ == "__main__":
     
     aircraft_dynamics_rk = AircraftDynamics(aircraft_info)
     
-    sim_dt = 1/500 # 1/frequency
+    sim_dt = 1/100 # 1/frequency
     
-    N = 1000
+    N = 100
     
     control_idx = 0
-    
+
     states_history = []
-    
+    controls_history = []
     #initialize the new states
     new_states_rk = init_states
     
     #tolerance 
-    tolerance = 1.0
+    tolerance = 5.0
     
-    for i in range(N):
+    rest_waypoints = planner_states.iloc[idx_goal:,:]
+    print("rest_waypoints: ", rest_waypoints)
+    wp_max = len(rest_waypoints)
+    
+    for i, wp in enumerate(rest_waypoints.iterrows()):
+        start_x = start_state[0]
+        start_y = start_state[1]
+        start_z  = start_state[2]
+        goal_x = wp[1]['x']
+        goal_y = wp[1]['y']
+        goal_z = wp[1]['z']        
+         
+        if i == 0:
+            goal_theta = np.arctan2(wp[1]['z'] - \
+                start_z, np.sqrt((wp[1]['x'] - start_x)**2 + (wp[1]['y'] - start_y)**2))
+            
+            goal_psi = np.arctan2(wp[1]['y'] - start_y,
+                                  wp[1]['x'] - start_x)
+        else:        
+            prev_wp = rest_waypoints.iloc[i-1]
+            goal_theta = np.arctan2(wp[1]['z'] - prev_wp['z'], 
+                                    np.sqrt((wp[1]['x'] - prev_wp['x'])**2 + (wp[1]['y'] - prev_wp['y'])**2))
+            goal_psi = np.arctan2(wp[1]['y'] - prev_wp['y'],
+                                    wp[1]['x'] - prev_wp['x'])
+            
+        wp[1]['theta_dg'] = np.rad2deg(goal_theta)
+        wp[1]['psi_dg']   = np.rad2deg(goal_psi)
         
-        input_aileron = control_dict['delta_a'][control_idx]
-        input_elevator = control_dict['delta_e'][control_idx]
-        input_rudder = control_dict['delta_r'][control_idx]
-        input_throttle = control_dict['delta_t'][control_idx]
-        
-        new_states_rk = aircraft_dynamics_rk.rk45(
-            input_aileron,
-            input_elevator,
-            input_rudder,
-            input_throttle,
-            aircraft_info.states,
-            sim_dt
-        )
-        
+        print("goal_theta", np.rad2deg(goal_theta))
+        print("goal_psi", np.rad2deg(goal_psi))
 
-        start_state = new_states_rk
-        aircraft_info.update_states(new_states_rk)
-        states_history.append(new_states_rk)
-
-        error_x = goal_x - new_states_rk[0]
-        error_y = goal_y - new_states_rk[1]
-        error_z = goal_z - new_states_rk[2]         
-
-        error_mag = np.sqrt(error_x**2 + error_y**2 + error_z**2)
-
-        if error_mag < tolerance:
-            print("reached goal", new_states_rk)
+        goal_states = np.array([goal_x, goal_y, goal_z,
+                                goal_u, goal_v, goal_w,
+                                goal_phi, goal_theta, goal_psi,
+                                goal_p, goal_q, goal_r])
+    
+        if i == 4:
             break
         
-        if i // mpc_freq == 0:
-            # print("recomputing mpc", i)
-            print("error", error_mag)
-            control_info, state_info = fw_mpc.solveMPCRealTimeStatic(
-                start_state, goal_state,init_controls)
-            control_dict = fw_mpc.unpack_controls(control_info)
-            state_dict = fw_mpc.unpack_states(state_info)
+        for k in range(N):
+            
+            input_aileron = control_dict['delta_a'][control_idx]
+            input_elevator = control_dict['delta_e'][control_idx]
+            input_rudder = control_dict['delta_r'][control_idx]
+            input_throttle = control_dict['delta_t'][control_idx]
+            
+            new_states_rk = aircraft_dynamics_rk.rk45(
+                input_aileron,
+                input_elevator,
+                input_rudder,
+                input_throttle,
+                aircraft_info.states,
+                sim_dt
+            )
+            
+            start_state = new_states_rk
+            aircraft_info.update_states(new_states_rk)
+            states_history.append(new_states_rk)
+            controls_history.append([input_aileron, input_elevator, 
+                                     input_rudder, input_throttle])
 
-        
+            error_x = goal_x - new_states_rk[0]
+            error_y = goal_y - new_states_rk[1]
+            error_z = goal_z - new_states_rk[2]         
+            error_mag = np.sqrt(error_x**2 + error_y**2 + error_z**2)
+
+            if error_mag < tolerance:
+                print("reached goal", new_states_rk, error_mag)
+                break
+            
+            if k // mpc_freq == 0:
+                print("recomputing mpc", k)
+                # print("updating frequency error", error_mag)
+                control_info, state_info = fw_mpc.solveMPCRealTimeStatic(
+                    start_state, goal_state,init_controls)
+                control_dict = fw_mpc.unpack_controls(control_info)
+                state_dict = fw_mpc.unpack_states(state_info)
+
+    #%%
     #set as pd 
     states = pd.DataFrame(states_history)
     states.columns = ['x', 'y', 'z', 'u', 'v', 'w', 'phi', 'theta', 'psi', 'p', 'q', 'r']
+    
+    rk_controls = pd.DataFrame(controls_history)
+    rk_controls.columns = ['delta_a', 'delta_e', 'delta_r', 'delta_t']
+    
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'})
     ax.plot(states['x'], states['y'], states['z'], 'o-', 
             label='Trajectory',)
@@ -240,6 +283,65 @@ if __name__ == "__main__":
     ax1[0].set_ylabel('Roll (deg)')
     ax1[1].set_ylabel('Pitch (deg)')
     ax1[2].set_ylabel('Yaw (deg)')
+
+    #loop through the waypoints and plot the heading
+    for i, wp in planner_states.iterrows():
+        ax.quiver3D(wp['x'], wp['y'], wp['z'],
+                    np.cos(np.deg2rad(wp['psi_dg'])),
+                    np.sin(np.deg2rad(wp['psi_dg'])),
+                    np.sin(np.deg2rad(wp['theta_dg'])), length=10, color='k')
+
+    # for wp, planner_states.iterrows:
+    #     ax.quiver3D(wp[1]['x'], wp[1]['y'], wp[1]['z'],
+    #                 np.cos(np.deg2rad(wp[1]['psi_dg'])),
+    #                 np.sin(np.deg2rad(wp[1]['psi_dg'])),
+    #                 0, length=5)
+    
+    #plot the state_dict
+    ax.plot(state_dict['x'], 
+            state_dict['y'], 
+            state_dict['z'], '-.', label='mpc')
+    ax.legend()
+
+    #set z axis limits
+    #ax.set_zlim(0, 30)
+    
+    #plot velocities in a subplot
+    fig, ax = plt.subplots(3,1, sharex=True)
+    ax[0].plot(states['u'], label='u')
+    ax[0].set_ylabel('u (m/s)')
+    ax[0].legend()
+    ax[1].plot(states['v'], label='v')
+    ax[1].set_ylabel('v (m/s)')
+    ax[1].legend()
+    ax[2].plot(states['w'], label='w')
+    ax[2].set_ylabel('w (m/s)')
+
+    #plot euler angles in a subplot
+    fig, ax = plt.subplots(3,1, sharex=True)
+    ax[0].plot(np.rad2deg(states['phi']), label='phi')
+    ax[0].set_ylabel('phi (deg)')
+    ax[0].legend()
+    ax[1].plot(np.rad2deg(states['theta']), label='theta')
+    ax[1].set_ylabel('theta (deg)')
+    ax[1].legend()
+    ax[2].plot(np.rad2deg(states['psi']), label='psi')
+    
+    #plot controls
+    fig, ax = plt.subplots(4,1, sharex=True)
+    ax[0].plot(np.rad2deg(rk_controls['delta_a']), label='delta_a')
+    ax[0].set_ylabel('delta_a (deg)')
+    ax[0].legend()
+    ax[1].plot(np.rad2deg(rk_controls['delta_e']), label='delta_e')
+    ax[1].set_ylabel('delta_e (deg)')
+    ax[1].legend()
+    ax[2].plot(np.rad2deg(rk_controls['delta_r']), label='delta_r')
+    ax[2].set_ylabel('delta_r (deg)')
+    ax[2].legend()
+    ax[3].plot(rk_controls['delta_t'], label='delta_t')
+    ax[3].set_ylabel('delta_t (N)')
+
+    #visualize 
     
     plt.show()
 
