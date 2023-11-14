@@ -28,8 +28,8 @@ if __name__=="__main__":
         'delta_e_min': np.deg2rad(-25),
         'delta_r_max': np.deg2rad(25),
         'delta_r_min': np.deg2rad(-25),
-        'delta_t_max': 300, #newtons
-        'delta_t_min': 15, #newtons
+        'delta_t_max': 0.65, #newtons
+        'delta_t_min': 0.35, #newtons
         'z_max': 20, #m
         'z_min': -20, #m
         'u_max': 25.0, #m/s
@@ -63,7 +63,7 @@ if __name__=="__main__":
 
     mpc_params = {
         'model': aircraft_ca,
-        'dt_val': 1/1200,
+        'dt_val': 1/100,
         'N': 5,
         'Q': Q,
         'R': R
@@ -101,7 +101,7 @@ if __name__=="__main__":
     init_al = np.deg2rad(0)
     init_el = np.deg2rad(0)
     init_rud = 0
-    init_throttle = 40
+    init_throttle = 0.45
 
     #load up planner states
     goal_x = planner_states['x'][idx_goal]

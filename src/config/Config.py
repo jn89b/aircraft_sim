@@ -1,9 +1,16 @@
+import numpy as np
+
+
 OBSTACLE_AVOID = False
 MULTIPLE_OBSTACLE_AVOID = False
 RADAR_AVOID = False
 N_OBSTACLES = 0
 BUFFER_DISTANCE = 0.0
 
+ACCEL_LIM = 14 * 9.81
+MAX_RADIAN = np.deg2rad(2000) 
+
+HOVER_THROTTLE = 0.5
 
 #NLP solver options
 MAX_ITER = 1500

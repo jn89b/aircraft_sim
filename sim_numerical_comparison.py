@@ -8,11 +8,11 @@ from src.aircraft.AircraftDynamics import AircraftDynamics
 from src.aircraft.Aircraft import AircraftInfo
 from src.Utils import get_airplane_params
 
-
 """
 
 Just evaluating the numerical approximations between the using 
 Euler's method and Runge-Kutta 4th order method.
+
 """
 
 
@@ -22,17 +22,46 @@ if __name__=="__main__":
     df = pd.read_csv("SIM_Plane_h_vals.csv")
     airplane_params = get_airplane_params(df)
     
-    init_states = {'x':0.0, 'y':0.0, 'z':0.0,
-                   'u':25.0, 'v':0.0, 'w':0.0,
-                   'phi':0.0, 'theta':0.0, 'psi':0.0,
-                   'p':0.0, 'q':0.0, 'r':0.0}
     
-    #a negatitive elevator command makes it go up 
-    controls = {'delta_e':-np.deg2rad(20), 
-                'delta_a':np.deg2rad(0.0), 
-                'delta_r':0.0, 
-                'delta_t':150.0}
+    use_csv_for_init = True
     
+    if use_csv_for_init == False:
+        
+        init_states = {'x':0.0, 'y':0.0, 'z':0.0,
+                    'u':21.0, 'v':0.0, 'w':0.0,
+                    'phi':0.0, 'theta':0.0, 'psi':0.0,
+                    'p':0.0, 'q':0.0, 'r':0.0}
+        
+        #a negatitive elevator command makes it go up 
+        controls = {'delta_e':np.deg2rad(0.0), 
+                    'delta_a':np.deg2rad(0.0), 
+                    'delta_r':np.deg2rad(0.0), 
+                    'delta_t':0.4}
+        
+    else:
+        #load csv file
+        states_df = pd.read_csv("final_states.csv")
+        #skip the first column
+        states_df = states_df.iloc[:,1:]
+        print(states_df)
+        init_states = states_df.iloc[-1].to_dict()
+        
+        controls_df = pd.read_csv("final_controls.csv")
+        controls_df = controls_df.iloc[:,1:]
+        controls = controls_df.iloc[-1].to_dict()
+        
+        
+        init_states = {'x':0.0, 'y':0.0, 'z':0.0,
+                    'u':23.0, 'v':0.0, 'w':-0.9037,
+                    'phi':0.0, 'theta':np.deg2rad(-0.003), 'psi':0.0,
+                    'p':0.0, 'q':0.0, 'r':0.0}
+        
+        controls = {'delta_e':np.deg2rad(-1.3), 
+                    'delta_a':np.deg2rad(0.0), 
+                    'delta_r':np.deg2rad(0.0), 
+                    'delta_t':0.63}
+        
+        
     aircraft_info_euler = AircraftInfo(
         airplane_params,
         init_states,
@@ -43,15 +72,15 @@ if __name__=="__main__":
         init_states,
         controls)
     
-
     aircraft_dynamics_eulers = AircraftDynamics(aircraft_info_euler)
     aircraft_dynamics_rk = AircraftDynamics(aircraft_info_rk)
 
-    dt = 1/1200        
+    dt = 0.01        
     t_init = 0.0
-    t_final = 5
+    t_final = 30.0
     N = int((t_final - t_init) / dt)
     print(N)
+    # N = 100
 
     input_aileron = controls['delta_a']
     input_elevator = controls['delta_e']
@@ -71,10 +100,10 @@ if __name__=="__main__":
             aircraft_info_euler.states,
             dt
         )
-
+        
         aircraft_info_euler.update_states(new_states_eulers)
         euler_states.append(new_states_eulers)
-
+        
         new_states_rk = aircraft_dynamics_rk.rk45(
             input_aileron,
             input_elevator,
@@ -85,16 +114,23 @@ if __name__=="__main__":
         )
         
         aircraft_info_rk.update_states(new_states_rk)
-
-
         rk_states.append(new_states_rk)
 
     euler_states = pd.DataFrame(euler_states)
     rk_states = pd.DataFrame(rk_states)
 
     #set column names
-    euler_states.columns = ['x','y','z','u','v','w','phi','theta','psi','p','q','r']
-    rk_states.columns = ['x','y','z','u','v','w','phi','theta','psi','p','q','r']
+    euler_states.columns = ['x','y','z',
+                            'u','v','w',
+                            'phi','theta',
+                            'psi','p','q','r']
+    
+    euler_states['z'] = -euler_states['z']
+    
+    rk_states.columns = ['x','y','z',
+                         'u','v','w',
+                         'phi','theta','psi',
+                         'p','q','r']
 
     #save rk45 states to csv
     rk_states.to_csv("rk45_states.csv", index=False)
@@ -116,18 +152,52 @@ if __name__=="__main__":
     ax.legend()
     #plot attitudes in euler angles in a subplot
     fig1, ax1 = plt.subplots(3,1,sharex=True)
-    ax1[0].plot(np.rad2deg(euler_states['phi']), label='Euler')
-    ax1[0].plot(np.rad2deg(rk_states['phi']), label='RK45')
+    time_vec = np.linspace(0, t_final, N)
+    ax1[0].plot(time_vec, np.rad2deg(euler_states['phi']), label='Euler')
+    ax1[0].plot(time_vec, np.rad2deg(rk_states['phi']), label='RK45')
 
-    ax1[1].plot(np.rad2deg(euler_states['theta']), label='Euler')
-    ax1[1].plot(np.rad2deg(rk_states['theta']), label='RK45')
+    ax1[1].plot(time_vec, np.rad2deg(euler_states['theta']), label='Euler')
+    ax1[1].plot(time_vec, np.rad2deg(rk_states['theta']), label='RK45')
 
-    ax1[2].plot(np.rad2deg(euler_states['psi']), label='Euler')
-    ax1[2].plot(np.rad2deg(rk_states['psi']), label='RK45')
+    ax1[2].plot(time_vec, np.rad2deg(euler_states['psi']), label='Euler')
+    ax1[2].plot(time_vec, np.rad2deg(rk_states['psi']), label='RK45')
     ax1[2].set_xlabel('Time (s)')
     ax1[0].set_ylabel('Roll (deg)')
     ax1[1].set_ylabel('Pitch (deg)')
     ax1[2].set_ylabel('Yaw (deg)')
+    
+    #plot 3d position
+    fig2, ax2 = plt.subplots(1,1,subplot_kw={'projection':'3d'})
+    
+    ax2.plot(euler_states['x'], euler_states['y'], euler_states['z'], 'o-',
+                label='Euler')  
+    
+    #format axis to be same scale
+    max_range = np.array([euler_states['x'].max()-euler_states['x'].min(),
+                            euler_states['y'].max()-euler_states['y'].min(),
+                            euler_states['z'].max()-euler_states['z'].min()]).max() / 2.0
+    
+    mid_x = (euler_states['x'].max()+euler_states['x'].min()) * 0.5
+    mid_y = (euler_states['y'].max()+euler_states['y'].min()) * 0.5
+    mid_z = (euler_states['z'].max()+euler_states['z'].min()) * 0.5
+    
+    ax2.set_xlim(mid_x - max_range, mid_x + max_range)
+    ax2.set_ylim(mid_y - max_range, mid_y + max_range)
+    ax2.set_zlim(mid_z - max_range, mid_z + max_range)
+    
+    #plot body velocities
+    fig3, ax3 = plt.subplots(3,1,sharex=True)
+    ax3[0].plot(time_vec, euler_states['u'], label='Euler')
+    ax3[0].plot(time_vec, rk_states['u'], label='RK45')
+    ax3[0].set_ylabel('u (m/s)')
+    ax3[1].plot(time_vec, euler_states['v'], label='Euler')
+    ax3[1].plot(time_vec, rk_states['v'], label='RK45')
+    ax3[1].set_ylabel('v (m/s)')
+    ax3[2].plot(time_vec, euler_states['w'], label='Euler')
+    ax3[2].plot(time_vec, rk_states['w'], label='RK45')
+    ax3[2].set_ylabel('w (m/s)')
+    ax3[2].set_xlabel('Time (s)')
+    
 
     def update(frame):
         ax.cla()  # Clear the previous frame
@@ -137,7 +207,7 @@ if __name__=="__main__":
         ax.set_title('Aircraft Animation')
 
         #keep last 100 frames
-        frame_len = 50
+        frame_len = 150
 
         if frame > frame_len:
             pos_bounds = 0.5

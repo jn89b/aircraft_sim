@@ -29,7 +29,6 @@ class FixedWingMPC(ModelPredictiveControl):
         self.lbx['X'][3, :] = self.airplane_params['u_min']
         self.ubx['X'][3, :] = self.airplane_params['u_max']
 
-        
         # self.lbx['X'][4, :] = self.airplane_params['v_min']
         # self.ubx['X'][4, :] = self.airplane_params['v_max']
 

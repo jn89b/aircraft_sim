@@ -481,7 +481,7 @@ if __name__=="__main__":
 
     # Optimal control problem
     opti = ca.Opti()
-    dt = 1/1200 # Time step
+    dt = 1/100 # Time step
     N = 100
     t_init = 0 # Initial time
 

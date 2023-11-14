@@ -4,6 +4,7 @@ import random
 import casadi as ca
 
 from src.aircraft.Aircraft import AircraftInfo
+from src.config import Config
 
 from src.math_lib.VectorOperations import euler_dcm_inertial_to_body, \
     compute_B_matrix, euler_dcm_body_to_inertial, ca_compute_B_matrix    
@@ -15,6 +16,8 @@ from src.math_lib.VectorOperations import ca_euler_dcm_body_to_inertial, \
 class AircraftDynamics():
     def __init__(self, aircraft:AircraftInfo) -> None:
         self.aircraft = aircraft
+        self.thrust_scale = self.aircraft.aircraft_params['mass'] * 9.81 / \
+            Config.HOVER_THROTTLE
 
     def compute_aoa(self, u:float, w:float) -> float:
         """
@@ -28,15 +31,16 @@ class AircraftDynamics():
         return np.arctan2(w, u)
 
     
-    def compute_beta(self, u:float, v:float) -> float:
+    def compute_beta(self, u:float, v:float, w:float) -> float:
         """
         Computes the sideslip angle
         """
         #check divide by zero 
         # if u == 0:
-        #     return 0.0
-        
-        return np.arctan2(v, u)
+        #     return 0.
+        airspeed = np.sqrt(u**2 + v**2 + w**2)
+        beta_rad = np.arcsin(v/airspeed)
+        return beta_rad
     
     def compute_moments(self,
                         input_aileron:float,
@@ -68,7 +72,7 @@ class AircraftDynamics():
         w = states[5]
 
         alpha = self.compute_aoa(u,w)
-        beta = self.compute_beta(u,v)
+        beta = self.compute_beta(u,v,w)
 
         #take sqrt of u^2 + v^2 + w^2 and make sure its not nan
         airspeed = np.linalg.norm(states[3:6])
@@ -107,7 +111,6 @@ class AircraftDynamics():
         CGOffset = [CGOffset_x, CGOffset_y, CGOffset_z]
 
         qbar = 0.5 * self.aircraft.rho * effective_airspeed**2 * s
-
 
         if effective_airspeed == 0:
             la, ma, na = 0, 0, 0
@@ -190,7 +193,7 @@ class AircraftDynamics():
         v = states[4]
         w = states[5]
         alpha_rad = self.compute_aoa(u,w)
-        beta_rad = self.compute_beta(u,v)
+        beta_rad = self.compute_beta(u,v,w)
 
         airspeed = np.linalg.norm(states[3:6])
         if np.isnan(airspeed):
@@ -241,11 +244,16 @@ class AircraftDynamics():
             f_az_b = qbar*(c_z_a + c_z_q*c*q/(2*airspeed) - \
                  c_drag_deltae*np.sin(alpha_rad)*abs(input_elevator_rad) - \
                     c_lift_deltae*np.cos(alpha_rad)*input_elevator_rad)
-            
+        
+        # scale the thrust to newtons
+        input_thrust = input_thrust * self.thrust_scale
+        
+        
         f_total_body = np.array([f_ax_b+input_thrust, 
                                  f_ay_b, 
                                  f_az_b])
 
+        # print("ftotal: ", f_total_body)
         return f_total_body
 
     def compute_ang_acc(self, moments:np.ndarray,
@@ -296,8 +304,15 @@ class AircraftDynamics():
                                         input_rudder_rad,
                                         forces,
                                         states)
+        
+        
+        
         # compute angular accelerations 
         p_q_r_dot = self.compute_ang_acc(moments, states)
+        
+        p_q_r_dot = np.clip(-Config.MAX_RADIAN, 
+                            Config.MAX_RADIAN, 
+                            p_q_r_dot)
         
         phi = states[6]
         theta = states[7]
@@ -306,7 +321,6 @@ class AircraftDynamics():
         B = compute_B_matrix(phi, theta, psi)
         
         # compute angular velocities
-        current_ang_velocities = states[9:12]
         #phi_theta_psi_dot = np.dot(B, current_ang_velocities)
         phi_theta_psi_dot = np.matmul(B, p_q_r_dot)
 
@@ -333,6 +347,10 @@ class AircraftDynamics():
         v_dot = forces[1]/mass + gravity_body_frame[1] - (r*u)  + (p*w)
         w_dot = forces[2]/mass + gravity_body_frame[2] - (p*v)  + (q*u)
 
+        u_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, u_dot)
+        v_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, v_dot)
+        w_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, w_dot)
+        
 
         #velocities
         dcm_body_to_inertial = euler_dcm_body_to_inertial(phi, theta, psi)
@@ -453,6 +471,9 @@ class AircraftCasadi():
         self.define_states()
         self.define_controls()
         self.aircraft_params = aircraft_params
+        self.thrust_scale = self.aircraft_params['mass'] * 9.81 / \
+            Config.HOVER_THROTTLE
+            
         self.compute_forces() 
         self.compute_moments()
 
@@ -507,8 +528,8 @@ class AircraftCasadi():
     def compute_beta(self) -> ca.MX:
         # Compute the sideslip angle
         # check divide by zero
-
-        beta = ca.if_else(self.u < 1e-2, 0.0, ca.atan2(self.v, self.u))
+        airspeed = ca.sqrt(self.u**2 + self.v**2 + self.w**2)
+        beta = ca.if_else(self.u < 1e-2, 0.0, ca.arcsin(self.v/airspeed))
         # return ca.atan2(self.v, self.u)
         return beta
 
@@ -695,6 +716,10 @@ class AircraftCasadi():
         f_az_b = ca.if_else(airspeed <= 1e-2, 0.0, f_az_b)
 
         # Define the total force in the body frame
+        
+        #scale the thrust to newtons
+        delta_t = delta_t * self.thrust_scale
+        
         f_total_body = ca.vertcat(f_ax_b + delta_t, f_ay_b, f_az_b)                    
         
 

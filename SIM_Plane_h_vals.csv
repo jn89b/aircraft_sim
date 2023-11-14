@@ -1,7 +1,7 @@
 var_name,var_val,var_type,var_linenum
 hover_throttle,0.5,float,43
 s,0.978,float,52
-b,5,float,53
+b,3.5,float,53
 c,0.28,float,54
 c_lift_0,0.35,float,55
 c_lift_deltae,0.011,float,56
