@@ -816,3 +816,72 @@ class AircraftCasadi():
     
         return self.f 
     
+class LonAirPlaneCasadi():
+    """
+    Longitudinal aircraft model
+    
+    A = [
+        X_u, X_w, 0, -g*cos(theta_0), 0;
+        Z_u, Z_w, u_0, -g*sin(theta_0), 0;
+        M_u, M_w, M_q, 0, 0;
+        0, 0, 1, 0, 0;
+        -sin(theta_0), cos(theta_0), 0, 0, 0
+    ]
+    
+    
+    B = [
+        X_deltae X_deltathrust;
+        Z_deltae 0;
+        M_deltae 0;
+        0 0;
+        0 0
+    ]
+    
+    u = [
+        delta_e;
+        delta_thrust
+    ]
+    
+    """
+    def __init__(self, A:np.ndarray, 
+                 B:np.ndarray, vel_trim:float) -> None:
+        self.A = A
+        self.B = B
+        
+        #velocity trim condition for the aircraft
+        self.vel_trim = vel_trim
+        self.define_states()
+        self.define_controls()
+        
+    def define_states(self) -> None:
+        self.u = ca.MX.sym('u')
+        self.w = ca.MX.sym('w')
+        self.q = ca.MX.sym('q')
+        self.theta = ca.MX.sym('theta')
+        self.h = ca.MX.sym('h')
+        
+        self.states = ca.vertcat(self.u, 
+                                 self.w, 
+                                 self.q, 
+                                 self.theta, 
+                                 self.h)
+        
+        self.n_states = self.states.size()[0]
+    
+    def define_controls(self) -> None:
+        self.delta_e = ca.MX.sym('delta_e')
+        self.delta_thrust = ca.MX.sym('delta_thrust')
+        
+        self.controls = ca.vertcat(self.delta_e, 
+                                   self.delta_thrust)
+        
+        self.n_controls = self.controls.size()[0]
+    
+    def set_state_space(self) -> None:
+        self.z_dot = ca.mtimes(self.A, self.states) + \
+            ca.mtimes(self.B, self.controls)
+            
+        self.function = ca.Function('f', [self.states, self.controls], 
+                                    [self.z_dot])
+        
+        

@@ -2,7 +2,68 @@ import casadi as ca
 import numpy as np
 from src.mpc.MPC import ModelPredictiveControl
 
+class LongitudinalMPC(ModelPredictiveControl):
+    def __init__(self, mpc_params:dict, 
+                 airplane_constraint_params:dict):
+        super().__init__(mpc_params)
+        self.airplane_params = airplane_constraint_params
+        
+    def addAdditionalConstraints(self):
+        self.lbx['U'][0, :] = self.airplane_params['delta_e_min']
+        self.ubx['U'][0, :] = self.airplane_params['delta_e_max']
+        
+        self.lbx['U'][1, :] = self.airplane_params['delta_t_min']
+        self.ubx['U'][1, :] = self.airplane_params['delta_t_max']
 
+        self.lbx['X'][1, :] = self.airplane_params['u_min']
+        self.ubx['X'][1, :] = self.airplane_params['u_max']
+        
+        self.lbx['X'][2, :] = self.airplane_params['w_min']
+        self.ubx['X'][2, :] = self.airplane_params['w_max']
+        
+        self.lbx['X'][3, :] = self.airplane_params['q_min']
+        self.ubx['X'][3, :] = self.airplane_params['q_max']
+        
+        self.lbx['X'][4, :] = self.airplane_params['theta_min']
+        self.ubx['X'][4, :] = self.airplane_params['theta_max']
+        
+        self.lbx['X'][5, :] = self.airplane_params['h_min']
+        self.ubx['X'][5, :] = self.airplane_params['h_max']
+        
+    def unpack_controls(self, u:ca.DM) -> dict:
+        """
+        unpack the control variables
+        """
+        control_dict = {
+            'delta_e': u[0,:],
+            'delta_t': u[1,:]
+        }
+
+        for k,v in control_dict.items():
+            control_dict[k] = np.array(v).reshape(-1)
+
+        return control_dict
+    
+    def unpack_states(self, x:ca.DM) -> dict:
+        """
+        unpack the state variables
+        """
+        #reshape to -1
+        # x = np.array(x).reshape(-1, 12)
+        state_dict = {
+            'u': np.array(x[0,:]),
+            'w': np.array(x[1,:]),
+            'q': np.array(x[2,:]),
+            'theta': np.array(x[3,:]),
+            'h': np.array(x[4,:])
+        }
+
+        for k,v in state_dict.items():
+            state_dict[k] = np.array(v).reshape(-1)
+        
+
+        return state_dict
+        
 class FixedWingMPC(ModelPredictiveControl):
     def __init__(self, mpc_params:dict, 
                  airplane_constraint_params:dict):

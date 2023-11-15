@@ -50,3 +50,12 @@ MPC FORMULATION
   - u v w
   - phi theta psi
   - p q r
+
+
+
+# Modeling Bullshit
+- Optimize to find trim conditions for aircraft
+- With this linearize aircraft 
+- Go to nonlinear equations to linear
+- Get the matrix bullshit then save as coefficients 
+  

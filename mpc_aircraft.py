@@ -530,7 +530,7 @@ if __name__=="__main__":
 
     # set cost function 
     # minimize the error between the final state and the goal state
-    #set weights for the cost function as a array
+    #set weights for the cost function as array
     weights = np.array([1.0, 1.0, 1.0, 
                         0, 0, 0,
                         0, 0, 0.5, 

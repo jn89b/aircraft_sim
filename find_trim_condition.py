@@ -6,10 +6,14 @@ import matplotlib.pyplot as plt
 from src.aircraft.AircraftDynamics import AircraftCasadi
 from src.Utils import get_airplane_params
 
-# https://www.youtube.com/watch?v=YzZI1V2mJw8&ab_channel=ChristopherLum
 
 """
 Steady State Straight and Level Trimmed Flight
+
+Utilizing optimal control to find the trim condition for 
+the aircraft to fly straight and level
+
+# https://www.youtube.com/watch?v=YzZI1V2mJw8&ab_channel=ChristopherLum
 
 """
 
@@ -272,7 +276,6 @@ if __name__=="__main__":
     print("elevator", np.rad2deg(sol.value(U[1,-1])))
     print("rudder", np.rad2deg(sol.value(U[2,-1])))
     print("throttle", sol.value(U[3,-1]))
-    
     
     #save the final values  and controls to a csv file
     #create a dictionary

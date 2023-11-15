@@ -380,7 +380,6 @@ class AircraftStateSpace():
         Z_d = self.aircraft.compute_Z_delta_e(q)
         M_d = self.aircraft.compute_M_delta_e(q)
            
-   
         A = [[X_u,  X_w,    0,        9.81], #delta u
              [Z_u,  Z_w,    velocity, 0], #delta w
              [0,    M_w,    M_q,      0], #delta q
