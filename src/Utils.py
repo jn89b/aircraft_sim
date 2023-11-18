@@ -6,9 +6,13 @@ import numpy as np
 def get_airplane_params(df:pd.DataFrame) -> dict:
     airplane_params = {}
     for index, row in df.iterrows():
-        airplane_params[row["var_name"]] = float(row["var_val"])
+        #check if we can't convert to float
+        try:
+            float(row["Value"])
+        except:
+            continue
+        airplane_params[row["Variable"]] = float(row["Value"])
 
-    airplane_params["mass"] = float(5) # kg
     
     return airplane_params
 

@@ -1,8 +1,5 @@
 import casadi as ca
-# import numpy as np
-# import math as m
-# from time import time
-# import Config
+import numpy as np
 from src.config import Config
 
 class ModelPredictiveControl():
@@ -32,6 +29,9 @@ class ModelPredictiveControl():
         self.S =  2.0#obstacle avoidance weight
         self.cost_fn = 0
         self.solver = None
+
+    def returnTimeVector(self):
+        time_vec = np.arange(0, self.N * self.dt_val, self.dt_val)
 
 
     def initDecisionVariables(self):
@@ -157,13 +157,13 @@ class ModelPredictiveControl():
         # solve the optimization problem
         solver_opts = {
             'ipopt': {
-                'max_iter': 1000,
-                'print_level': 2,
-                'acceptable_tol': 1e-2,
-                'acceptable_obj_change_tol': 1e-2,
-                'hessian_approximation': 'limited-memory',  # Set Hessian approximation method here
+                'max_iter': Config.MAX_ITER,
+                'print_level': Config.PRINT_LEVEL,
+                'acceptable_tol': Config.ACCEPT_TOL,
+                'acceptable_obj_change_tol': Config.ACCEPT_OBJ_TOL,
+                # 'hessian_approximation': 'limited-memory',  # Set Hessian approximation method here
             },
-            'print_time': 0
+            'print_time': Config.PRINT_TIME
         }
 
         #create solver
@@ -205,6 +205,7 @@ class ModelPredictiveControl():
         
         self.state_init = ca.DM(start)        # initial state
         self.state_target = ca.DM(goal)  # target state
+        print("state_init: ", self.state_init)
         self.controls = ca.DM(controls)  # initial control
         # self.t0 = t0
         #self.u0 = ca.DM.zeros((self.n_controls, self.N))  # initial control 

@@ -18,8 +18,11 @@ MAX_TIME = 0.1
 PRINT_LEVEL = 2
 ACCEPT_TOL = 1e-2
 ACCEPT_OBJ_TOL = 1e-2   
-PRINT_TIME = 0
+PRINT_TIME = 1
 
+#Gravity    
+G = 9.81
+RHO = 1.225
 
 #Target options
 TARGET_DISCHARGE_RATE = 0.1

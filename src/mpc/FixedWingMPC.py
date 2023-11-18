@@ -15,20 +15,20 @@ class LongitudinalMPC(ModelPredictiveControl):
         self.lbx['U'][1, :] = self.airplane_params['delta_t_min']
         self.ubx['U'][1, :] = self.airplane_params['delta_t_max']
 
-        self.lbx['X'][1, :] = self.airplane_params['u_min']
-        self.ubx['X'][1, :] = self.airplane_params['u_max']
+        self.lbx['X'][0, :] = self.airplane_params['u_min']
+        self.ubx['X'][0, :] = self.airplane_params['u_max']
         
-        self.lbx['X'][2, :] = self.airplane_params['w_min']
-        self.ubx['X'][2, :] = self.airplane_params['w_max']
+        self.lbx['X'][1, :] = self.airplane_params['w_min']
+        self.ubx['X'][1, :] = self.airplane_params['w_max']
         
-        self.lbx['X'][3, :] = self.airplane_params['q_min']
-        self.ubx['X'][3, :] = self.airplane_params['q_max']
+        self.lbx['X'][2, :] = self.airplane_params['q_min']
+        self.ubx['X'][2, :] = self.airplane_params['q_max']
         
-        self.lbx['X'][4, :] = self.airplane_params['theta_min']
-        self.ubx['X'][4, :] = self.airplane_params['theta_max']
+        self.lbx['X'][3, :] = self.airplane_params['theta_min']
+        self.ubx['X'][3, :] = self.airplane_params['theta_max']
         
-        self.lbx['X'][5, :] = self.airplane_params['h_min']
-        self.ubx['X'][5, :] = self.airplane_params['h_max']
+        # self.lbx['X'][4, :] = self.airplane_params['h_min']
+        # self.ubx['X'][4, :] = self.airplane_params['h_max']
         
     def unpack_controls(self, u:ca.DM) -> dict:
         """
@@ -54,14 +54,11 @@ class LongitudinalMPC(ModelPredictiveControl):
             'u': np.array(x[0,:]),
             'w': np.array(x[1,:]),
             'q': np.array(x[2,:]),
-            'theta': np.array(x[3,:]),
-            'h': np.array(x[4,:])
-        }
+            'theta': np.array(x[3,:])}
 
         for k,v in state_dict.items():
             state_dict[k] = np.array(v).reshape(-1)
         
-
         return state_dict
         
 class FixedWingMPC(ModelPredictiveControl):

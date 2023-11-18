@@ -27,6 +27,7 @@ if __name__ == "__main__":
     plt.close('all')
     df = pd.read_csv("SIM_Plane_h_vals.csv")
     airplane_params = get_airplane_params(df)
+    print("airplane_params", airplane_params)
     aircraft_ca = AircraftCasadi(aircraft_params=airplane_params)
     aircraft_ca.set_state_space()
 

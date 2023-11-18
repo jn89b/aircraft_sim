@@ -1,0 +1,11 @@
+- Missing the following in the first sheet:
+  - c_drag_0
+  - lift coefficient calculation,C_l:
+    - Changes as a function of alpha but for now steady level flight
+      - Using equation $L=W=mg$
+    - c_drag_a computations from spreadsheet:
+      - Where does the 6 come from aspect ratio? 
+      - Forgot a parenthesis
+  - M_de calcs
+    - Used airspeed should be dynamic 
+

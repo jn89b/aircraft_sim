@@ -1,3 +1,5 @@
-- Install pyvista
-- Install stl
-- pip install numpy-stl
+- pip3 install casadi
+- pip3 install matplotlib 
+- pip3 install controls
+- pip3 install seaborn
+- pip3 install numpy 
