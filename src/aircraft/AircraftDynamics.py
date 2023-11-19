@@ -1328,3 +1328,281 @@ class LonAirPlaneCasadi():
                             
         self.f = ca.Function('lon_dynamics', [self.states, self.controls], 
                                     [self.z_dot])
+class LatAirPlane():
+    """
+    A = [
+        Y_v, Y_p, Y_r, 0, -g*cos(theta_0);
+        L_v, L_p, L_r, 0, 0;
+        N_v, N_p, N_r, 0, 0;
+        0, 1, tan(theta_0), 0, 0;
+        0, 0, sec(theta_0), 0, 0
+    ]
+    
+    B = [
+        Y_deltaa Y_deltar;
+        L_deltaa L_deltar;
+        N_deltaa N_deltar;
+        0 0;
+        0 0
+    ]
+    
+    u = [
+        delta_a;
+        delta_r
+    ]
+    
+    """
+    def __init__(self, aircraft_params:dict) -> None:
+        self.aircraft_params = aircraft_params
+        
+    def lift_coeff(self, alpha:float) -> float:
+        """
+        Computes the lift coefficient with a linear and flat plate model
+        """
+        coefficient = self.aircraft_params
+        alpha0 = coefficient["alpha_stall"]
+        M = coefficient["mcoeff"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+
+        max_alpha_delta = 0.8
+        if alpha - alpha0 > max_alpha_delta:
+            alpha = alpha0 + max_alpha_delta
+        elif alpha0 - alpha > max_alpha_delta:
+            alpha = alpha0 - max_alpha_delta
+
+        sigmoid = (1 + np.exp(-M * (alpha - alpha0)) + \
+                   np.exp(M * (alpha + alpha0))) / (1 + math.exp(-M * (alpha - alpha0))) \
+                    / (1 + math.exp(M * (alpha + alpha0)))
+        linear = (1.0 - sigmoid) * (c_lift_0 + c_lift_a0 * alpha)  # Lift at small AoA
+        flat_plate = sigmoid * (2 * math.copysign(1, alpha) * math.pow(math.sin(alpha), 2) * math.cos(alpha))  # Lift beyond stall
+
+        return linear + flat_plate
+    
+    def drag_coeff(self, alpha:float) -> float:
+        """
+        computes the induced drag coefficient with a linear and flat plate model
+        https://www.grc.nasa.gov/www/k-12/VirtualAero/BottleRocket/airplane/induced.html
+        """
+        coefficient = self.aircraft_params
+        b = coefficient["b"]
+        s = coefficient["s"]
+        c_drag_p = coefficient["c_drag_p"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+        oswald = coefficient["oswald"]
+        
+        ar = pow(b, 2) / s
+        c_drag_a = c_drag_p + pow(c_lift_0 + c_lift_a0 * alpha, 2) / (np.pi * oswald * ar)
+
+        return c_drag_a
+    
+    def compute_A(self, velocity:float, 
+                  theta_rad:float) -> np.ndarray:
+        
+        Q = 0.5 * Config.RHO * velocity**2
+        m = self.aircraft_params['mass']
+        s = self.aircraft_params['s']
+        b = self.aircraft_params['b']
+        
+        c_y_b = self.aircraft_params['c_y_b']
+        c_y_p = self.aircraft_params['c_y_p']
+        
+        c_y_r = self.aircraft_params['c_y_r']
+        c_l_b = self.aircraft_params['c_l_b']
+        
+        c_l_p = self.aircraft_params['c_l_p']
+        c_l_r = self.aircraft_params['c_l_r']
+        c_n_b = self.aircraft_params['c_n_b']
+        c_n_p = self.aircraft_params['c_n_p']
+        c_n_r = self.aircraft_params['c_n_r']
+        c_n_deltar = self.aircraft_params['c_n_deltar']
+        
+        Ix = self.aircraft_params['Ixx']
+        Iz = self.aircraft_params['Izz']
+        
+        Y_beta = Q * s * c_y_b / m
+        Y_p = Q * s * b * c_y_p / (2 * m * velocity)
+        Y_r = Q * s * b * c_y_r / (2 * m * velocity)
+        
+        L_beta = Q * s * b * c_l_b / Ix
+        L_p = Q * s * b**2 * c_l_p / (2 * Ix * velocity)
+        L_r =  Q * s * b**2 * c_l_r / (2 * Ix  * velocity)
+
+        N_beta = Q * s * b * c_n_b / Iz;
+        N_p = Q * s * b**2 * c_n_p / (2 * Iz * velocity)
+        N_r = Q * s * b**2 * c_n_r / (2 * Iz * velocity)
+        N_dr = Q * s * b * c_n_deltar / Iz;
+        
+        G = Config.G
+        c_theta = np.cos(theta_rad)
+        
+        A = [[Y_beta/velocity,  Y_p/velocity,   -(1 - (Y_r/velocity)),      (G*c_theta)/velocity],
+              [L_beta,           L_p,            L_r,                           0],
+              [N_beta,           N_p,            N_r,                           0],
+              [0,                 1,             0,                             0]]
+        
+        return A
+    
+    def compute_B(self, velocity:float) -> np.ndarray:
+        """
+        computes the B lateral matrix of the aircraft
+        """
+        Q = 0.5 * Config.RHO * velocity**2
+        s = self.aircraft_params['s']
+        b = self.aircraft_params['b']
+        m = self.aircraft_params['mass']
+        
+        Ix = self.aircraft_params['Ixx']
+        Iz = self.aircraft_params['Izz']
+        
+        c_l_da = self.aircraft_params['c_l_deltaa']
+        c_y_dr = self.aircraft_params['c_y_deltar']
+        
+        c_l_dr = self.aircraft_params['c_l_deltar']
+        c_n_da = self.aircraft_params['c_n_deltaa']
+        c_n_dr = self.aircraft_params['c_n_deltar']
+        
+        L_da = Q * s * b * c_l_da / Ix;
+        L_dr = Q * s * b * c_l_dr / Ix;
+        
+        N_da = Q * s * b * c_n_da / Iz;
+        N_dr = Q * s * b * c_n_dr / Iz;
+        
+        Ydr = Q * s * c_y_dr / m;
+        
+        B = [[0.0 , Ydr/velocity],
+             [L_da, L_dr],
+             [N_da, N_dr],
+             [0.0 , 0.0]]
+        
+        return B
+    
+    def compute_derivatives(self, 
+                            input_aileron_rad:float,
+                            input_rudder_rad:float, 
+                            states:np.ndarray,
+                            A:np.ndarray,
+                            B:np.ndarray) -> np.ndarray:
+        
+        controls = np.array([input_aileron_rad, input_rudder_rad])
+        
+        x_dot = np.matmul(A, states) + np.matmul(B, controls)
+        
+        return x_dot
+    
+    def rk45(self,
+                input_aileron_rad:float,
+                input_rudder_rad:float, 
+                states:np.ndarray, A:np.ndarray,
+                B:np.ndarray,
+                delta_time:float) -> np.ndarray:
+            """
+            Simulates the aircraft using the Runge-Kutta 4th order method 
+            """
+            #get the current states
+            current_states = states
+    
+            #compute the derivatives
+            k1 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                            input_rudder_rad,
+                                            current_states, A, B)
+            
+            k2 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                            input_rudder_rad,
+                                            current_states + k1/2, A, B)
+            
+            k3 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                            input_rudder_rad,
+                                            current_states + k2/2, A, B)
+            
+            k4 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                            input_rudder_rad,
+                                            current_states + k3, A, B)
+            
+            new_states = current_states + (k1 + 2*k2 + 2*k3 + k4) / 6
+            
+            return new_states
+        
+class LatAirPlaneCasadi():
+    """
+    Lateral aircraft model for use with casadi
+    
+    A = [
+        Y_v, Y_p, Y_r, 0, -g*cos(theta_0);
+        L_v, L_p, L_r, 0, 0;
+        N_v, N_p, N_r, 0, 0;
+        0, 1, tan(theta_0), 0, 0;
+        0, 0, sec(theta_0), 0, 0
+    ]
+    
+    B = [
+        Y_deltaa Y_deltar;
+        L_deltaa L_deltar;
+        N_deltaa N_deltar;
+        0 0;
+        0 0
+    ]
+    
+    u = [
+        delta_a;
+        delta_r
+    ]
+    
+    Need to have a static A computed
+    Have A be updated as A_dot
+    
+    Have B computed statically as well
+    Have B be updated as B_dot
+    
+    Multiply Adot and Bdot with controls to get the
+    derivatives of the states    
+    """
+    def __init__(self, aircraft_params:dict, 
+                 use_own_A:bool=False,
+                 A:np.ndarray=None,
+                 use_own_B:bool=False,
+                 B:np.ndarray=None) -> None:
+        self.aircraft_params = aircraft_params
+        #velocity trim condition for the aircraft
+        self.define_states()
+        self.define_controls()
+        
+        self.use_own_A = use_own_A
+        self.use_own_B = use_own_B
+        
+        if use_own_A == False:
+            self.compute_A()
+        else:
+            self.A = A
+        
+        if use_own_B == False:
+            self.compute_B()
+        else:
+            self.B = B
+        
+    def define_states(self) -> None:
+        self.v = ca.MX.sym('v')
+        self.p = ca.MX.sym('p')
+        self.r = ca.MX.sym('r')
+        self.phi = ca.MX.sym('phi')
+        self.psi = ca.MX.sym('psi')
+        
+        self.states = ca.vertcat(self.v, 
+                                 self.p, 
+                                 self.r, 
+                                 self.phi,
+                                 self.psi)
+        
+        self.n_states = self.states.size()[0]
+    
+    def define_controls(self) -> None:
+        self.delta_a = ca.MX.sym('delta_a')
+        self.delta = ca.MX.sym('delta_r')
+        self.controls = ca.vertcat(self.delta_a, 
+                                   self.delta)
+        
+        self.n_controls = self.controls.size()[0]
+        
+        
+        

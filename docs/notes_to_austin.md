@@ -12,4 +12,4 @@
 
 - I don't think dynamic A's and B's will work:
   - Would need to trim then find the A's and B's for that then adjust 
-  - Look up tables would be expensive
+- Have better results setting using Nominal A and B matrices 

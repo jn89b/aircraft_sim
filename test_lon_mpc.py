@@ -36,11 +36,11 @@ lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
 lon_aircraft.set_state_space()
 
 Q = np.diag([1.0, 0.0, 0.0, 1.0, 0.0])
-R = np.diag([0.2, 0.0])
+R = np.diag([0.5, 0.0])
 
 mpc_params = {
     'model': lon_aircraft,
-    'dt_val': 0.1,
+    'dt_val': 0.05,
     'N': 20,
     'Q': Q,
     'R': R,
@@ -86,7 +86,7 @@ start_control = np.array([controls['delta_e'],
                           controls['delta_t']])
 
 #terminal conditions
-goal_state = np.array([25, 
+goal_state = np.array([35, 
                        0, 
                        np.deg2rad(0), 
                        np.deg2rad(-20),
@@ -109,20 +109,34 @@ control_results = lon_mpc.unpack_controls(control_results)
 state_results = lon_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 15 #seconds
+t_final = 10 #seconds
 idx_start = 1
 
 control_history = []
 state_history = []
 position_history = []
+goal_history = []
 
 x_original = 0
 y_original = 0
 z_original = 0
 
 N = int(t_final/mpc_params['dt_val'])
+time_current = 0
+
 for i in range(N):
     #print("iteration: ", i , "out of ", N)
+    #check the goal start after half the time
+    if time_current > t_final/2:
+        new_vel = 15
+        new_theta = np.deg2rad(20)
+        new_height = -45.0
+        goal_state = np.array([new_vel, 
+                               0, 
+                               np.deg2rad(0), 
+                               new_theta,
+                               new_height])
+        
     lon_mpc.reinitStartGoal(start_state, goal_state)
 
     control_results, state_results = lon_mpc.solveMPCRealTimeStatic(
@@ -159,6 +173,9 @@ for i in range(N):
     z_original = inertial_pos[2]
     
     position_history.append(inertial_pos)
+    goal_history.append(goal_state)
+    
+    time_current += mpc_params['dt_val']
     
 print("final position: ", inertial_pos)
 # get global position of the aircraft
@@ -175,15 +192,21 @@ h = [x[4] for x in state_history]
 delta_t = [x[1] for x in control_history]
 delta_e = [x[0] for x in control_history]
 
+u_goal = [x[0] for x in goal_history]
+w_goal = [x[1] for x in goal_history]
+q_goal = [x[2] for x in goal_history]
+theta_goal = [x[3] for x in goal_history]
+h_goal = [x[4] for x in goal_history]
+
 #%% 
 time_vec = np.arange(0, len(delta_t)*mpc_params['dt_val'], mpc_params['dt_val'])
 
-#create a line for the goal state
-u_goal = np.ones(len(time_vec)) * goal_state[0]
-w_goal = np.ones(len(time_vec)) * goal_state[1]
-q_goal = np.ones(len(time_vec)) * goal_state[2]
-theta_goal = np.ones(len(time_vec)) * goal_state[3]
-h_goal = np.ones(len(time_vec)) * goal_state[4]
+# #create a line for the goal state
+# u_goal = np.ones(len(time_vec)) * goal_state[0]
+# w_goal = np.ones(len(time_vec)) * goal_state[1]
+# q_goal = np.ones(len(time_vec)) * goal_state[2]
+# theta_goal = np.ones(len(time_vec)) * goal_state[3]
+# h_goal = np.ones(len(time_vec)) * goal_state[4]
 
 #drop last element of time_vec
 print("len time_vec: ", len(time_vec))
