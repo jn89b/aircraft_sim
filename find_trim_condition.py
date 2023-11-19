@@ -21,6 +21,7 @@ if __name__=="__main__":
 
     df = pd.read_csv("SIM_Plane_h_vals.csv")
     airplane_params = get_airplane_params(df)
+    print("mass", airplane_params['mass'])
     aircraft = AircraftCasadi(airplane_params)
 
     f = aircraft.set_state_space()
@@ -28,7 +29,7 @@ if __name__=="__main__":
     init_x = 0
     init_y = 0
     init_z = 0
-    init_u = 25
+    init_u = 18
     init_v = 0
     init_w = 0
     init_phi = 0
@@ -49,6 +50,9 @@ if __name__=="__main__":
     goal_phi = np.deg2rad(0)
     goal_theta = np.deg2rad(0)
     goal_psi = np.deg2rad(0)
+
+    desired_airspeed = 25
+
 
     states = np.array([
         init_x, init_y, init_z,
@@ -75,7 +79,7 @@ if __name__=="__main__":
     # Optimal control problem
     opti = ca.Opti()
     dt = 1/100 # Time step
-    N = 20
+    N = 50
     t_init = 0 # Initial time
 
     # Define the states over the optimization problem
@@ -125,7 +129,6 @@ if __name__=="__main__":
     # state_error = weights*ca.sumsqr((X[:, -1] - xF))
     #cost_fn = ca.sumsqr(weights * (X[:, -1] - xF) + ca.sumsqr(weights_controls*U**2))
     # magnitude airspeed error
-    desired_airspeed = 25
     
     cost = 0
     
@@ -151,9 +154,11 @@ if __name__=="__main__":
         k4 = f(X[:,k] + dt * k3, U[:,k])
         x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
         opti.subject_to(X[:,k+1]==x_next) # Use initial state
+        
+        dz = X[2,k+1] - X[2,k]
     
         #minimize gamma, theta, velocity and error of desired velocity
-        cost_fn += ca.sumsqr(gamma) + ca.sumsqr(theta) + ca.sumsqr(v) + ca.sumsqr(v_a - desired_airspeed) 
+        cost_fn += ca.sumsqr(gamma) + ca.sumsqr(theta) + ca.sumsqr(v) + ca.sumsqr(v_a - desired_airspeed) + ca.sumsqr(dz)
 
     # solve the optimization problem
     opts = {

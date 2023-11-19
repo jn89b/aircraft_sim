@@ -470,7 +470,7 @@ class AircraftCasadi():
         self.define_states()
         self.define_controls()
         self.aircraft_params = aircraft_params
-        self.aircraft_params['mass'] = 5.0
+        # self.aircraft_params['mass'] = 5.0
         self.thrust_scale = self.aircraft_params['mass'] * 9.81 / \
             Config.HOVER_THROTTLE
             
@@ -769,7 +769,7 @@ class AircraftCasadi():
         g = 9.81
 
         mass = self.aircraft_params["mass"]
-
+        print("mass is: ", mass)
         B = ca_compute_B_matrix(self.phi, self.theta, self.psi)
         ang_vel_bf = ca.vertcat(self.p, self.q, self.r)
         attitudes = ca.mtimes(B, ang_vel_bf)
@@ -823,10 +823,50 @@ class LonAirPlane():
     def __init__(self, aircraft_params:dict) -> None:
         self.aircraft_params = aircraft_params
     
+    def lift_coeff(self, alpha:float) -> float:
+        """
+        Computes the lift coefficient with a linear and flat plate model
+        """
+        coefficient = self.aircraft_params
+        alpha0 = coefficient["alpha_stall"]
+        M = coefficient["mcoeff"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+
+        max_alpha_delta = 0.8
+        if alpha - alpha0 > max_alpha_delta:
+            alpha = alpha0 + max_alpha_delta
+        elif alpha0 - alpha > max_alpha_delta:
+            alpha = alpha0 - max_alpha_delta
+
+        sigmoid = (1 + np.exp(-M * (alpha - alpha0)) + \
+                   np.exp(M * (alpha + alpha0))) / (1 + math.exp(-M * (alpha - alpha0))) \
+                    / (1 + math.exp(M * (alpha + alpha0)))
+        linear = (1.0 - sigmoid) * (c_lift_0 + c_lift_a0 * alpha)  # Lift at small AoA
+        flat_plate = sigmoid * (2 * math.copysign(1, alpha) * math.pow(math.sin(alpha), 2) * math.cos(alpha))  # Lift beyond stall
+
+        return linear + flat_plate
+    
+    def drag_coeff(self, alpha:float) -> float:
+        """
+        computes the induced drag coefficient with a linear and flat plate model
+        https://www.grc.nasa.gov/www/k-12/VirtualAero/BottleRocket/airplane/induced.html
+        """
+        coefficient = self.aircraft_params
+        b = coefficient["b"]
+        s = coefficient["s"]
+        c_drag_p = coefficient["c_drag_p"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+        oswald = coefficient["oswald"]
+        
+        ar = pow(b, 2) / s
+        c_drag_a = c_drag_p + pow(c_lift_0 + c_lift_a0 * alpha, 2) / (np.pi * oswald * ar)
+
+        return c_drag_a
+    
     def compute_A(self, u_airspeed_ms:float,
                   theta_rad:float, 
-                  use_alpha:bool=False,
-                  alpha:float=0.0,
                   use_w:bool=False,
                   w:float=0.0) -> None:
         """
@@ -842,7 +882,7 @@ class LonAirPlane():
         
         RHO = Config.RHO
         G = Config.G
-        q = 0.5 * RHO * u_airspeed_ms**2
+        Q = 0.5 * RHO * u_airspeed_ms**2
         m = self.aircraft_params['mass']
         s = self.aircraft_params['s']
         c = self.aircraft_params['c']
@@ -858,10 +898,18 @@ class LonAirPlane():
         # c_m_deltae = self.aircraft_params['c_m_deltae']
         
         c_lift_0 = self.aircraft_params['c_lift_0']
-        c_drag_0 = self.aircraft_params['c_drag_0']
+        
+        if 'c_drag_0' in self.aircraft_params:
+            c_drag_0 = self.aircraft_params['c_drag_0']
+        else:
+            c_drag_0 = 0.0
         # c_drag_a = self.aircraft_params['c_drag_a']
         
-        c_lift_u = self.aircraft_params['c_lift_u']
+        if 'c_lift_u' not in self.aircraft_params:
+            c_lift_u = 0.0
+        else:
+            c_lift_u = self.aircraft_params['c_lift_u']
+        
         c_lift_a = self.aircraft_params['c_lift_a']
         
         #aspect ratio
@@ -875,42 +923,50 @@ class LonAirPlane():
         else:
             oswald = 0.7
     
-        if use_alpha == True:
-            alpha = alpha
+        s_theta = np.sin(theta_rad)
+        c_theta = np.cos(theta_rad)
+    
+        if use_w == True:
+            constant = u_airspeed_ms*s_theta + w*c_theta
+            alpha = np.arctan2(w, u_airspeed_ms)
         else:
+            constant = u_airspeed_ms*s_theta
             alpha = theta_rad
 
         #lift coefficient 
-        C_l = m*G / (0.5*RHO*u_airspeed_ms**2*s)
+        #C_l = (m*G / (Q*s)) * alpha
+        C_l = self.lift_coeff(alpha)
 
-        c_drag_a = c_drag_p + np.power(c_lift_0 + C_l,2) / \
-            (np.pi * oswald * ar)
-                    
-        c_drag_u = self.aircraft_params['c_drag_u']
+        # c_drag_a = c_drag_p + np.power(c_lift_0 + c_lift_a*alpha,2) / \
+        #     (np.pi * oswald * ar)
+        k = 1/(np.pi) * oswald * ar
+        # k = 1/np.pi * 6 * 0.7 # wtf is this 
+        
+        # c_drag_a = k * (C_l)**2             
+        c_drag_a = self.drag_coeff(alpha)
+        
+        #check if c_drag_u exists in the dictionary
+        if 'c_drag_u' in self.aircraft_params:
+            c_drag_u = self.aircraft_params['c_drag_u']
+        else:
+            c_drag_u = 0.0
         
         #remind Austin to add the mass term in first spreadsheet
-        X_u = -(c_drag_u + (2*c_drag_0)) * q * s / (m*u_airspeed_ms)
-        X_w = -(c_drag_a - c_lift_0) * q * s  / (m*u_airspeed_ms)
+        X_u = -(c_drag_u + 2*c_drag_0) * Q * s / (m*u_airspeed_ms)
+        X_w = -(c_drag_a - c_lift_0) * Q * s  / (m*u_airspeed_ms)
         
-        Z_u = -(c_lift_u + (2*c_lift_0)) * q * s / (m*u_airspeed_ms)
-        Z_w = -(c_lift_a + c_drag_0) * q * s / (m*u_airspeed_ms)
+        Z_u = -(c_lift_u + (2*c_lift_0)) * Q * s / (m*u_airspeed_ms)
+        Z_w = -(c_lift_a + c_drag_0) * Q * s / (m*u_airspeed_ms)
         Z_q = u_airspeed_ms #THIS IS WEIRD
                 
         M_u = 0.0 
-        M_w = (c_m_a) * q * s * c / (Iyy*u_airspeed_ms)
-        M_q = (c_m_q) * c * q * s * c / (2*Iyy*u_airspeed_ms*u_airspeed_ms)
-        
-        s_theta = np.sin(theta_rad)
-        c_theta = np.cos(theta_rad)
-
-        if use_w == True:
-            constant = u_airspeed_ms*s_theta + w*c_theta
-        else:
-            constant = u_airspeed_ms*s_theta
+        M_w = (c_m_a * Q * s * c) / (Iyy*u_airspeed_ms)
+        #M_q = (c_m_q) * c * Q * s * c / (2*Iyy*u_airspeed_ms*u_airspeed_ms)
+        M_q = (c_m_q * c / (2 * u_airspeed_ms)) * (Q * s * c / Iyy);
         
         A = np.array([
-            [X_u, X_w, 0,            -G*c_theta, 0],
-            [Z_u, Z_w, Z_q,          -G*s_theta, 0],
+            [X_u, X_w, 0,            -G, 0],
+            [Z_u, Z_w, Z_q,          0, 0],
             [M_u, M_w, M_q,           0, 0],
             [0 ,  0,   1,             0, 0],
             [-s_theta ,  -c_theta,   0, constant, 0]])
@@ -924,7 +980,7 @@ class LonAirPlane():
         return A[0,1]
     
     def get_X_q(self,A:np.ndarray) -> float:
-        return A[0,2]
+        return A[0,2]   
     
     def get_eigenvalues(self, A:np.ndarray) -> np.ndarray:
         """
@@ -961,7 +1017,7 @@ class LonAirPlane():
             X_dt = 1/(m)
             
             Z_de = -Q * c_lift_deltae * s / m
-            M_de = c_m_deltae * Q * s * c / Iyy
+            M_de = -c_m_deltae * (Q * s * c) /(Iyy) 
             
             B = np.array([
                 [X_de, X_dt],
@@ -980,9 +1036,12 @@ class LonAirPlane():
                             A:np.ndarray,
                             B:np.ndarray) -> np.ndarray:
         
-        controls = np.ndarray((2,1))
-        controls[0,0] = input_elevator_rad
-        controls[1,0] = input_thrust_n
+        thrust_scale = self.aircraft_params['mass'] * 9.81 / \
+            Config.HOVER_THROTTLE
+            
+        input_thrust_n = input_thrust_n * thrust_scale
+        
+        controls = np.array([input_elevator_rad, input_thrust_n])
         
         x_dot = np.matmul(A, states) + np.matmul(B, controls)
         
@@ -1056,26 +1115,41 @@ class LonAirPlaneCasadi():
     Multiply Adot and Bdot with controls to get the
     derivatives of the states    
     """
-    def __init__(self, aircraft_params:dict) -> None:
+    def __init__(self, aircraft_params:dict, 
+                 use_own_A:bool=False,
+                 A:np.ndarray=None,
+                 use_own_B:bool=False,
+                 B:np.ndarray=None) -> None:
         self.aircraft_params = aircraft_params
-        
         #velocity trim condition for the aircraft
         self.define_states()
         self.define_controls()
-        self.compute_A()
-        self.compute_B()
+        
+        self.use_own_A = use_own_A
+        self.use_own_B = use_own_B
+        
+        if use_own_A == False:
+            self.compute_A()
+        else:
+            self.A = A
+        
+        if use_own_B == False:
+            self.compute_B()
+        else:
+            self.B = B
         
     def define_states(self) -> None:
         self.u = ca.MX.sym('u')
         self.w = ca.MX.sym('w')
         self.q = ca.MX.sym('q')
         self.theta = ca.MX.sym('theta')
-        # self.h = ca.MX.sym('h')
+        self.h = ca.MX.sym('h')
         
         self.states = ca.vertcat(self.u, 
                                  self.w, 
                                  self.q, 
-                                 self.theta)
+                                 self.theta,
+                                 self.h)
         
         self.n_states = self.states.size()[0]
     
@@ -1096,6 +1170,9 @@ class LonAirPlaneCasadi():
 
         u = self.states[0]
         w = self.states[1]
+        
+        airspeed = ca.sqrt(u**2 + w**2)
+        
         q = self.states[2]
         theta = self.states[3]
         alpha_rad = ca.if_else(u < 1e-2, 0.0 , ca.atan2(w, u))
@@ -1115,45 +1192,58 @@ class LonAirPlaneCasadi():
         c_m_a = self.aircraft_params['c_m_a']
         c_m_q = self.aircraft_params['c_m_q']
         # c_m_deltae = self.aircraft_params['c_m_deltae']
-        
         c_lift_0 = self.aircraft_params['c_lift_0']
-        c_drag_0 = self.aircraft_params['c_drag_0']
+        
+        if 'c_drag_0' in self.aircraft_params:
+            c_drag_0 = self.aircraft_params['c_drag_0']
+        else:
+            c_drag_0 = 0.0
         # c_drag_a = self.aircraft_params['c_drag_a']
         
-        c_lift_u = self.aircraft_params['c_lift_u']
-        c_lift_a = self.aircraft_params['c_lift_a']
-        
-        #aspect ratio
-        ar = np.power(b,2)/s
-        
-        c_drag_p = self.aircraft_params['c_drag_p']
-    
+        if 'c_lift_u' not in self.aircraft_params:
+            c_lift_u = 0.0
+        else:
+            c_lift_u = self.aircraft_params['c_lift_u']
+                
         #check if oswald exists in the dictionary
         if 'oswald' in self.aircraft_params:
             oswald = self.aircraft_params['oswald']
         else:
             oswald = 0.7
     
-        #lift coefficient 
-        C_l = m*G / (Q*s)
+        #aspect ratio
+        ar = np.power(b,2)/s
+        
+        c_drag_p = self.aircraft_params['c_drag_p']
 
-        c_drag_a = c_drag_p + ca.power(c_lift_0 + C_l*alpha_rad,2) / \
-            (ca.pi * oswald * ar)
+        #lift coefficient         
+        c_lift_a = self.aircraft_params['c_lift_a']
                     
+        #lift coefficient 
+        C_l = (m*G / (Q*s)) * alpha_rad
+
+        # c_drag_a = c_drag_p + np.power(c_lift_0 + c_lift_a*alpha,2) / \
+        #     (np.pi * oswald * ar)
+        k = 1/(np.pi) * oswald * ar
+        # k = 1/np.pi * 6 * 0.7 # wtf is this 
+        
+        c_drag_a = k * (C_l)**2          
         c_drag_u = self.aircraft_params['c_drag_u']
         
         #remind Austin to add the mass term in first spreadsheet
         X_u = -(c_drag_u + (2*c_drag_0)) * Q * s / (m*u)
         X_w = -(c_drag_a - c_lift_0) * Q * s  / (m*u)
         
+        X_q = 0.0
+        
         Z_u = -(c_lift_u + (2*c_lift_0)) * Q * s / (m*u)
         Z_w = -(c_lift_a + c_drag_0) * Q * s / (m*u)
         Z_q = u #THIS IS WEIRD
                 
-        M_u = 0.0 
+        M_u = 0.0
         M_w = (c_m_a) * Q * s * c / (Iyy*u)
-        M_q = (c_m_q) * c * Q * s * c / (2*Iyy*u*u)
-        
+        M_q = (c_m_q * c / (2 * u)) * (Q * s * c / Iyy);
+                
         s_theta = ca.sin(theta)
         c_theta = ca.cos(theta)
 
@@ -1161,10 +1251,11 @@ class LonAirPlaneCasadi():
         
         #create a casadi 5 x 5 matrix
         A = ca.vertcat(
-            ca.horzcat(X_u, X_w, 0,  -G*c_theta),
-            ca.horzcat(Z_u, Z_w, Z_q, -G*s_theta),
-            ca.horzcat(M_u, M_w, M_q, 0),
-            ca.horzcat(0 ,  0,   1,             0))
+            ca.horzcat(X_u, X_w, X_q,  -G*c_theta, 0),
+            ca.horzcat(Z_u, Z_w, Z_q, -G*s_theta, 0),
+            ca.horzcat(M_u, M_w, M_q, 0, 0),
+            ca.horzcat(0 ,  0,   1,             0),
+            ca.horzcat(-s_theta ,  -c_theta,   0, constant, 0))
                 
         self.A_function = ca.Function('compute_A',
                                     [self.states],
@@ -1175,7 +1266,7 @@ class LonAirPlaneCasadi():
         
     def compute_B(self) -> None:
         """
-        
+        compute B matrices
         """
         u = self.states[0]
         thrust = self.controls[1] * self.thrust_scale
@@ -1189,14 +1280,13 @@ class LonAirPlaneCasadi():
         Q = 0.5 * Config.RHO * u**2
         
         m = self.aircraft_params['mass']
-        Z_de = -c_lift_deltae * Q * s / (m*u)
-        Z_deltathrust = 0.0
-                
-        X_de = 0.0
-        X_dt = 1/(m)
         
+        Z_deltathrust = 0.0
+        X_de = 0.0
+        X_dt = 1/m
         Z_de = -Q * c_lift_deltae * s / m
-        M_de = c_m_deltae * Q * s * c / Iyy
+
+        M_de = -c_m_deltae * (Q * s * c) /(Iyy) 
         
         B = ca.vertcat(
             ca.horzcat(X_de, X_dt),
@@ -1205,9 +1295,9 @@ class LonAirPlaneCasadi():
             ca.horzcat(0  ,  0))
 
         controls = ca.vertcat(self.delta_e, thrust)
-        print("controls", controls)
         Bu = ca.mtimes(B, controls)  
-        print(Bu)      
+
+
         self.B_function = ca.Function('compute_B',
                                     [self.states, self.controls],
                                     [Bu],
@@ -1218,16 +1308,23 @@ class LonAirPlaneCasadi():
 
     def set_state_space(self) -> None:
         #map thrust to newtons 
-        A = self.A_function(self.states)
-        Bu = self.B_function(self.states, self.controls)
+        
+        if self.use_own_A == False:
+            A = self.A_function(self.states)
+        else:
+            A = self.A
+            
+        if self.use_own_B == False:
+            Bu = self.B_function(self.states, self.controls)
+        else:
+            B = self.B
+            #normalize thrust to newtons
+            thrust = self.controls[1] * self.thrust_scale
+            controls = ca.vertcat(self.delta_e, thrust)
+            Bu = ca.mtimes(B, controls)
+        #Bu = self.B_function(self.states, self.controls)
                         
-        self.z_dot = ca.mtimes(A, self.states) + \
-            Bu
+        self.z_dot = ca.mtimes(A, self.states) + Bu
                             
         self.f = ca.Function('lon_dynamics', [self.states, self.controls], 
                                     [self.z_dot])
-                
-    
-
-
-        

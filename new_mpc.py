@@ -99,9 +99,9 @@ if __name__=="__main__":
     init_r = 0
 
     init_al = np.deg2rad(0)
-    init_el = np.deg2rad(0)
+    init_el = np.deg2rad(-1.06)
     init_rud = 0
-    init_throttle = 0.45
+    init_throttle = 0.64
 
     #load up planner states
     goal_x = planner_states['x'][idx_goal]

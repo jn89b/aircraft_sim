@@ -21,12 +21,11 @@ if __name__=="__main__":
 
     df = pd.read_csv("SIM_Plane_h_vals.csv")
     airplane_params = get_airplane_params(df)
-    
-    
+
     use_csv_for_init = True
     
     if use_csv_for_init == False:
-        
+            
         init_states = {'x':0.0, 'y':0.0, 'z':0.0,
                     'u':21.0, 'v':0.0, 'w':0.0,
                     'phi':0.0, 'theta':0.0, 'psi':0.0,
@@ -43,7 +42,6 @@ if __name__=="__main__":
         states_df = pd.read_csv("final_states.csv")
         #skip the first column
         states_df = states_df.iloc[:,1:]
-        print(states_df)
         init_states = states_df.iloc[-1].to_dict()
         
         controls_df = pd.read_csv("final_controls.csv")
@@ -52,16 +50,15 @@ if __name__=="__main__":
         
         
         init_states = {'x':0.0, 'y':0.0, 'z':0.0,
-                    'u':23.0, 'v':0.0, 'w':-0.9037,
-                    'phi':0.0, 'theta':np.deg2rad(-0.003), 'psi':0.0,
+                    'u':18.0, 'v':0.0, 'w':0.578,
+                    'phi':0.0, 'theta':np.deg2rad(0.0306), 'psi':0.0,
                     'p':0.0, 'q':0.0, 'r':0.0}
         
-        controls = {'delta_e':np.deg2rad(-1.3), 
+        controls = {'delta_e':np.deg2rad(10.93), 
                     'delta_a':np.deg2rad(0.0), 
                     'delta_r':np.deg2rad(0.0), 
-                    'delta_t':0.63}
-        
-        
+                    'delta_t':0.128}
+
     aircraft_info_euler = AircraftInfo(
         airplane_params,
         init_states,

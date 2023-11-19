@@ -7,5 +7,9 @@
       - Where does the 6 come from aspect ratio? 
       - Forgot a parenthesis
   - M_de calcs
-    - Used airspeed should be dynamic 
+    - Used airspeed should be dynamic
+    - Should be -cm_deltae 
 
+- I don't think dynamic A's and B's will work:
+  - Would need to trim then find the A's and B's for that then adjust 
+  - Look up tables would be expensive

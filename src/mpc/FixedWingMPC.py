@@ -18,8 +18,8 @@ class LongitudinalMPC(ModelPredictiveControl):
         self.lbx['X'][0, :] = self.airplane_params['u_min']
         self.ubx['X'][0, :] = self.airplane_params['u_max']
         
-        self.lbx['X'][1, :] = self.airplane_params['w_min']
-        self.ubx['X'][1, :] = self.airplane_params['w_max']
+        # self.lbx['X'][1, :] = self.airplane_params['w_min']
+        # self.ubx['X'][1, :] = self.airplane_params['w_max']
         
         self.lbx['X'][2, :] = self.airplane_params['q_min']
         self.ubx['X'][2, :] = self.airplane_params['q_max']
@@ -54,7 +54,8 @@ class LongitudinalMPC(ModelPredictiveControl):
             'u': np.array(x[0,:]),
             'w': np.array(x[1,:]),
             'q': np.array(x[2,:]),
-            'theta': np.array(x[3,:])}
+            'theta': np.array(x[3,:]),
+            'h': np.array(x[4,:])}
 
         for k,v in state_dict.items():
             state_dict[k] = np.array(v).reshape(-1)

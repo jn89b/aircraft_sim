@@ -12,7 +12,6 @@ def get_airplane_params(df:pd.DataFrame) -> dict:
         except:
             continue
         airplane_params[row["Variable"]] = float(row["Value"])
-
     
     return airplane_params
 

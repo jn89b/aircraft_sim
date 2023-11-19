@@ -1,4 +1,4 @@
-var_name,var_val,var_type,var_linenum
+Variable,Value,var_type,var_linenum
 hover_throttle,0.5,float,43
 s,0.978,float,52
 b,3.5,float,53
@@ -45,3 +45,5 @@ Ixx,2.1408,float,x
 Iyy,8.7344,float,x
 Izz,10.7211,float,x
 Ixz,0.1149,float,x
+mass,23.5,float,x
+c_drag_0,0.16
