@@ -36,12 +36,12 @@ lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
 lon_aircraft.set_state_space()
 
 Q = np.diag([1.0, 0.0, 0.0, 1.0, 0.0])
-R = np.diag([0.5, 0.0])
+R = np.diag([0.2, 0.0])
 
 mpc_params = {
     'model': lon_aircraft,
     'dt_val': 0.05,
-    'N': 20,
+    'N': 15,
     'Q': Q,
     'R': R,
 }
@@ -49,9 +49,9 @@ mpc_params = {
 lon_mpc_constraints = {
     'delta_e_min': np.deg2rad(-30),
     'delta_e_max': np.deg2rad(30),
-    'delta_t_min': 0.1,
-    'delta_t_max': 1.0,
-    'u_min': 10,
+    'delta_t_min': 0.05,
+    'delta_t_max': 0.75,
+    'u_min': 15,
     'u_max': 35,
     'w_min': -0.5,
     'w_max': 0.5,
@@ -62,10 +62,10 @@ lon_mpc_constraints = {
 }
 
 states = {
-    'u': 15,
+    'u': 25,
     'w': 0.0,
     'q': 0,
-    'theta': np.deg2rad(0),
+    'theta': np.deg2rad(-0.03),
     'h': 0.0
 }
 
@@ -86,11 +86,12 @@ start_control = np.array([controls['delta_e'],
                           controls['delta_t']])
 
 #terminal conditions
-goal_state = np.array([35, 
+goal_theta = -7.2 
+goal_state = np.array([25, 
                        0, 
                        np.deg2rad(0), 
-                       np.deg2rad(-20),
-                       45.0])
+                       np.deg2rad(goal_theta),
+                       0.0])
 
 #begin mpc
 lon_mpc = LongitudinalMPC(mpc_params, lon_mpc_constraints)
@@ -109,7 +110,7 @@ control_results = lon_mpc.unpack_controls(control_results)
 state_results = lon_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 10 #seconds
+t_final = 20 #seconds
 idx_start = 1
 
 control_history = []
@@ -128,14 +129,14 @@ for i in range(N):
     #print("iteration: ", i , "out of ", N)
     #check the goal start after half the time
     if time_current > t_final/2:
-        new_vel = 15
-        new_theta = np.deg2rad(20)
+        new_vel = 25
+        new_theta = goal_theta
         new_height = -45.0
         goal_state = np.array([new_vel, 
                                0, 
-                               np.deg2rad(0), 
-                               new_theta,
-                               new_height])
+                               0.0, 
+                               np.deg2rad(new_theta),
+                               0.0])
         
     lon_mpc.reinitStartGoal(start_state, goal_state)
 
@@ -161,7 +162,7 @@ for i in range(N):
     state_history.append(start_state)
     control_history.append(start_control)
     
-    R = euler_dcm_body_to_inertial(0, state_results['theta'][idx_start], 0)
+    R = euler_dcm_body_to_inertial(0, start_state[3], 0)
     body_vel = np.array([start_state[0], 0, start_state[1]])
     inertial_vel = np.matmul(R, body_vel)
     
@@ -198,6 +199,9 @@ q_goal = [x[2] for x in goal_history]
 theta_goal = [x[3] for x in goal_history]
 h_goal = [x[4] for x in goal_history]
 
+#compute angle of attack
+alpha = np.arctan(np.array(w)/np.array(u))
+
 #%% 
 time_vec = np.arange(0, len(delta_t)*mpc_params['dt_val'], mpc_params['dt_val'])
 
@@ -212,7 +216,7 @@ time_vec = np.arange(0, len(delta_t)*mpc_params['dt_val'], mpc_params['dt_val'])
 print("len time_vec: ", len(time_vec))
 plt.close('all')
 #plot the results
-fig,ax = plt.subplots(5,1, figsize=(10,10))
+fig,ax = plt.subplots(6,1, figsize=(10,10))
 ax[0].plot(time_vec,u, label='u')
 ax[0].plot(time_vec,u_goal, label='u_goal', linestyle='--')
 ax[0].set_ylabel('u (m/s)')
@@ -233,12 +237,16 @@ ax[4].plot(time_vec,h, label='h')
 ax[4].plot(time_vec,h_goal, label='h_goal', linestyle='--')
 ax[4].set_ylabel('h (deg)')
 
+ax[5].plot(time_vec,np.rad2deg(alpha), label='alpha')
+ax[5].set_ylabel('alpha (deg)')
+
 #show legend
 ax[0].legend()
 ax[1].legend()
 ax[2].legend()
 ax[3].legend()
 ax[4].legend()
+ax[5].legend()
 
 
 #%% 

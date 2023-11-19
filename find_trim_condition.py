@@ -29,7 +29,7 @@ if __name__=="__main__":
     init_x = 0
     init_y = 0
     init_z = 0
-    init_u = 18
+    init_u = 24.9
     init_v = 0
     init_w = 0
     init_phi = 0
@@ -134,15 +134,15 @@ if __name__=="__main__":
     
     #compute airstream velocity
     v_a = ca.sqrt(X[3,:]**2 + X[4,:]**2 + X[5,:]**2)
-    
+    z = X[2,:]
     alpha = ca.atan(X[5,:]/X[3,:])
     theta = X[7,:]
     gamma = theta - alpha
     v = X[4,:]
-
+    
     #minimze teh change of height
     cost_fn = 0
-    cost_fn = cost_fn + ca.sumsqr(X[3,:] - desired_airspeed)  + ca.sumsqr(v)
+    cost_fn = cost_fn + ca.sumsqr(X[3,:] - desired_airspeed) + ca.sumsqr(z - goal_z)
     
     opti.minimize(cost_fn) 
 
@@ -154,11 +154,15 @@ if __name__=="__main__":
         k4 = f(X[:,k] + dt * k3, U[:,k])
         x_next = X[:,k] + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
         opti.subject_to(X[:,k+1]==x_next) # Use initial state
-        
-        dz = X[2,k+1] - X[2,k]
-    
+                
+        z = X[2,k]
+        alpha = ca.atan(X[5,:]/X[3,:])
+        theta = X[7,:]
+        gamma = theta - alpha
+        v = X[4,:]
+
         #minimize gamma, theta, velocity and error of desired velocity
-        cost_fn += ca.sumsqr(gamma) + ca.sumsqr(theta) + ca.sumsqr(v) + ca.sumsqr(v_a - desired_airspeed) + ca.sumsqr(dz)
+        cost_fn += ca.sumsqr(gamma) + ca.sumsqr(theta) + ca.sumsqr(v) + ca.sumsqr(v_a - desired_airspeed) + ca.sumsqr(z - goal_z)
 
     # solve the optimization problem
     opts = {
@@ -257,7 +261,10 @@ if __name__=="__main__":
     #plot airspeed
     fig, axs = plt.subplots(1,1)
     airspeed = np.sqrt(sol.value(X[3,:])**2 + sol.value(X[4,:])**2 + sol.value(X[5,:])**2)
-    axs.plot(t_vec, airspeed)
+    axs.plot(t_vec, airspeed, label='u (m/s)')
+    axs.set_xlabel('time (s)')
+
+    axs.legend()
 
     #print the cost function
     print("Cost Function", sol.value(cost_fn))

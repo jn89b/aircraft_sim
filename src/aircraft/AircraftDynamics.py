@@ -927,7 +927,7 @@ class LonAirPlane():
         c_theta = np.cos(theta_rad)
     
         if use_w == True:
-            constant = u_airspeed_ms*s_theta + w*c_theta
+            constant = (u_airspeed_ms*s_theta) + (w*c_theta)
             alpha = np.arctan2(w, u_airspeed_ms)
         else:
             constant = u_airspeed_ms*s_theta
@@ -963,10 +963,11 @@ class LonAirPlane():
         M_w = (c_m_a * Q * s * c) / (Iyy*u_airspeed_ms)
         #M_q = (c_m_q) * c * Q * s * c / (2*Iyy*u_airspeed_ms*u_airspeed_ms)
         M_q = (c_m_q * c / (2 * u_airspeed_ms)) * (Q * s * c / Iyy);
-        
+        c_theta = np.cos(theta_rad)
+        s_theta = np.sin(theta_rad)
         A = np.array([
-            [X_u, X_w, 0,            -G, 0],
-            [Z_u, Z_w, Z_q,          0, 0],
+            [X_u, X_w, 0,            -G*c_theta, 0],
+            [Z_u, Z_w, Z_q,          -G*s_theta, 0],
             [M_u, M_w, M_q,           0, 0],
             [0 ,  0,   1,             0, 0],
             [-s_theta ,  -c_theta,   0, constant, 0]])

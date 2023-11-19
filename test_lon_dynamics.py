@@ -11,13 +11,13 @@ lon_airplane = LonAirPlane(airplane_params)
 
 init_states = {
     'u': 25,
-    'w': 0.829,
+    'w': 0.924,
     'q': 0,
-    'theta': np.deg2rad(-0.03),
+    'theta': np.deg2rad(-0.002),
     'h': 0.0,
 }
 
-delta_e_cmd = 10.03
+delta_e_cmd = 9.67
 max_input = delta_e_cmd
 
 init_controls = {
@@ -54,6 +54,7 @@ N = int(t_final / dt)
 
 state_history = []
 control_history = []
+delta_x_history = []
 
 print("A matrix:", A)
 print("B matrix:", B)
@@ -65,6 +66,7 @@ print("Bu:", Bu)
 eigen_history = []
 
 current_time = 0
+
 for i in range(N):
     
     #at first third of N set elevator to 
@@ -77,6 +79,13 @@ for i in range(N):
     else:
         delta_e_cmd = np.deg2rad(max_input)
     
+    
+    # A = lon_airplane.compute_A(states[0],
+    #                              states[3],
+    #                              True,
+    #                              states[1])
+    
+    # B = lon_airplane.compute_B(states[0])
 
     controls = np.array([delta_e_cmd,
                         init_controls['delta_t']])
@@ -87,17 +96,15 @@ for i in range(N):
     state_history.append(states)
     control_history.append(controls)
     
-    # A = lon_airplane.compute_A(states[0], 
-    #                            states[3],
-    #                            True,
-    #                            states[1]
-    #                            )
-    
+    delta_x = np.matmul(A, states) + np.matmul(B, controls)
     
     # B = lon_airplane.compute_B(states[0])
     
     eigenvalues = np.linalg.eigvals(A)
+    
     eigen_history.append(eigenvalues)
+    delta_x_history.append(delta_x)
+    
     
     current_time += dt
     
@@ -106,6 +113,7 @@ import matplotlib.pyplot as plt
 plt.close('all')
 state_history = np.array(state_history)
 control_history = np.array(control_history)
+delta_x_history = np.array(delta_x_history)
 
 fig,axis = plt.subplots(5,1, figsize=(10,10))
 axis[0].plot(state_history[:,0], label='u')
@@ -119,6 +127,19 @@ axis[2].legend()
 axis[3].legend()
 axis[4].legend()
 
+#plot delta_x history
+fig,ax = plt.subplots(5,1, figsize=(10,10))
+ax[0].plot(delta_x_history[:,0], label='delta_x')
+ax[0].set_ylabel('delta_x (m/s)')
+ax[1].plot(delta_x_history[:,1], label='delta_w')
+ax[1].set_ylabel('delta_w (m/s)')
+ax[2].plot(np.rad2deg(delta_x_history[:,2]), label='delta_q')
+ax[2].set_ylabel('delta_q (deg/s)')
+ax[3].plot(np.rad2deg(delta_x_history[:,3]), label='delta_theta')
+ax[3].set_ylabel('delta_theta (deg)')
+ax[4].plot(delta_x_history[:,4], label='delta_h')
+ax[4].set_ylabel('delta_h (m)')
+
 #plot time_vec,controls
 time_vec = np.arange(0, len(control_history)*dt, dt)
 fig,ax = plt.subplots(2,1, figsize=(10,10))
@@ -126,6 +147,8 @@ ax[0].plot(time_vec,np.rad2deg(control_history[:,0]), label='delta_e')
 ax[0].set_ylabel('delta_e (deg)')
 ax[1].plot(time_vec,control_history[:,1], label='delta_t')
 ax[1].set_ylabel('delta_t')
+
+
 
 #plot the eigenvalues in one plot as a function of time
 eigen_history = np.array(eigen_history)
