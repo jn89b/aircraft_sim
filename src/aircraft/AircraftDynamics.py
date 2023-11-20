@@ -970,12 +970,13 @@ class LonAirPlane():
         s_theta = np.sin(theta_rad)
         
         A = np.array([
-            [X_u, X_w, 0,            -G*c_theta, 0 , 0],
-            [Z_u, Z_w, Z_q,          -G*s_theta, 0,  0],
-            [M_u, M_w, M_q,           0, 0, 0],
-            [0 ,  0,   1,             0, 0, 0],
-            [-s_theta ,  c_theta,   0, constant, 0, 0],
-            [c_theta,    s_theta,   0, constant2, 0, 0]])
+            [X_u, X_w, 0,            -G*c_theta, 0 , 0], #u
+            [Z_u, Z_w, Z_q,          -G*s_theta, 0,  0], #w
+            [M_u, M_w, M_q,           0, 0, 0],          #q
+            [0 ,  0,   1,             0, 0, 0],          #theta
+            [-s_theta ,  c_theta,   0, constant, 0, 0],  #z
+            [c_theta,    s_theta,   0, constant2, 0, 0]  #x
+            ])
         
         return A 
     
@@ -1343,6 +1344,7 @@ class LatAirPlane():
         N_v, N_p, N_r, 0, 0;
         0, 1, tan(theta_0), 0, 0;
         0, 0, sec(theta_0), 0, 0
+        1, 0, 0, 0, 0,      u*cos(theta_0), 0
     ]
     
     B = [
@@ -1350,6 +1352,7 @@ class LatAirPlane():
         L_deltaa L_deltar;
         N_deltaa N_deltar;
         0 0;
+        0 0,
         0 0
     ]
     
@@ -1357,6 +1360,9 @@ class LatAirPlane():
         delta_a;
         delta_r
     ]
+    
+    states are as follows:
+    [v, p, r, phi, psi, y]
     
     """
     def __init__(self, aircraft_params:dict) -> None:
@@ -1443,11 +1449,22 @@ class LatAirPlane():
         
         G = Config.G
         c_theta = np.cos(theta_rad)
+        s_theta = np.sin(theta_rad)
         
-        A = [[Y_beta/velocity,  Y_p/velocity,   -(1 - (Y_r/velocity)),      (G*c_theta)/velocity],
-              [L_beta,           L_p,            L_r,                           0],
-              [N_beta,           N_p,            N_r,                           0],
-              [0,                 1,             0,                             0]]
+        # c_phi = np.cos(phi_rad)
+        # s_phi = np.sin(phi_rad)
+        
+        tan_theta = np.tan(theta_rad)
+        sec_theta = 1 / c_theta
+        
+        A = np.array([
+            [Y_beta,           Y_p,      -(velocity - Y_r),  (G*c_theta),      0,    0], #v
+            [L_beta,           L_p,            L_r,           0,               0,    0], #p 
+            [N_beta,           N_p,            N_r,           0,               0,    0], #r
+            [0,                 1,             tan_theta,     0,               0,    0], #phi
+            [0,                 0,             sec_theta,     0,               0,    0], #psi
+            [1,                 0,             0,             velocity*c_theta,0,    0]  #y
+            ])
         
         return A
     
@@ -1478,10 +1495,12 @@ class LatAirPlane():
         
         Ydr = Q * s * c_y_dr / m;
         
-        B = [[0.0 , Ydr/velocity],
+        B = np.array([[0.0 , Ydr/velocity],
              [L_da, L_dr],
              [N_da, N_dr],
-             [0.0 , 0.0]]
+             [0.0 , 0.0], 
+             [0.0 ,  0.0],
+             [0.0 ,  0.0]])
         
         return B
     
@@ -1570,6 +1589,8 @@ class LatAirPlaneCasadi():
                  A:np.ndarray=None,
                  use_own_B:bool=False,
                  B:np.ndarray=None) -> None:
+        
+        
         self.aircraft_params = aircraft_params
         #velocity trim condition for the aircraft
         self.define_states()
@@ -1594,12 +1615,14 @@ class LatAirPlaneCasadi():
         self.r = ca.MX.sym('r')
         self.phi = ca.MX.sym('phi')
         self.psi = ca.MX.sym('psi')
+        self.y = ca.MX.sym('y')
         
         self.states = ca.vertcat(self.v, 
                                  self.p, 
                                  self.r, 
                                  self.phi,
-                                 self.psi)
+                                 self.psi,
+                                 self.y)
         
         self.n_states = self.states.size()[0]
     
@@ -1610,6 +1633,17 @@ class LatAirPlaneCasadi():
                                    self.delta)
         
         self.n_controls = self.controls.size()[0]
+        
+    def set_state_space(self) -> None:
+        A = self.A 
+        B = self.B
+        Bu = ca.mtimes(B, self.controls)
+        
+        self.z_dot = ca.mtimes(A, self.states) + Bu
+        
+        self.f = ca.Function('lat_dynamics', [self.states, self.controls],
+                                    [self.z_dot])
+        
         
         
         

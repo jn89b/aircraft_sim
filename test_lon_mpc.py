@@ -133,7 +133,7 @@ time_current = 0
 for i in range(N):
 
     if time_current > t_final/2:
-        new_vel = 25
+        new_vel = 35
         new_theta = goal_theta
         new_height = 5.0
         new_x = goal_x
@@ -239,7 +239,7 @@ ax[1].set_ylabel('w (m/s)')
 
 ax[2].plot(time_vec,np.rad2deg(q), label='q')
 ax[2].plot(time_vec,np.rad2deg(q_goal), label='q_goal', linestyle='--')
-ax[2].set_ylabel('q (rad/s)')
+ax[2].set_ylabel('q (deg/s)')
 
 ax[3].plot(time_vec,np.rad2deg(theta), label='theta')
 ax[3].plot(time_vec,np.rad2deg(theta_goal), label='theta_goal', linestyle='--')
@@ -247,7 +247,7 @@ ax[3].set_ylabel('theta (deg)')
 
 ax[4].plot(time_vec,h, label='h')
 ax[4].plot(time_vec,h_goal, label='h_goal', linestyle='--')
-ax[4].set_ylabel('h (deg)')
+ax[4].set_ylabel('h (meters)')
 
 ax[5].plot(time_vec,np.rad2deg(alpha), label='alpha')
 ax[5].set_ylabel('alpha (deg)')
