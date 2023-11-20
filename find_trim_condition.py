@@ -52,8 +52,6 @@ if __name__=="__main__":
     goal_psi = np.deg2rad(0)
 
     desired_airspeed = 25
-
-
     states = np.array([
         init_x, init_y, init_z,
         init_u, init_v, init_w,
@@ -131,7 +129,6 @@ if __name__=="__main__":
     # magnitude airspeed error
     
     cost = 0
-    
     #compute airstream velocity
     v_a = ca.sqrt(X[3,:]**2 + X[4,:]**2 + X[5,:]**2)
     z = X[2,:]

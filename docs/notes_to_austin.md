@@ -32,4 +32,3 @@ https://eng.libretexts.org/Bookshelves/Aerospace_Engineering/Aerodynamics_and_Ai
 # What I need from Austin
 - Give me the coefficients like usual 
 - Give me the trim conditions, I'll handle the rest 
-- 

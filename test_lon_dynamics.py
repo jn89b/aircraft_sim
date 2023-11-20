@@ -15,6 +15,7 @@ init_states = {
     'q': 0,
     'theta': np.deg2rad(-0.002),
     'h': 0.0,
+    'x': 0.0,
 }
 
 delta_e_cmd = 9.67
@@ -43,7 +44,8 @@ states = np.array([init_states['u'],
                      init_states['w'],
                      init_states['q'],
                      init_states['theta'],
-                     init_states['h']])
+                     init_states['h'],
+                     init_states['x']])
 
 controls = np.array([init_controls['delta_e'],
                         init_controls['delta_t']])

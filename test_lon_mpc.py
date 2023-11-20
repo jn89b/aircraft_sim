@@ -35,8 +35,8 @@ lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
                                  A_lon, True, B_lon)
 lon_aircraft.set_state_space()
 
-Q = np.diag([1.0, 0.0, 0.0, 1.0, 0.0])
-R = np.diag([0.2, 0.0])
+Q = np.diag([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+R = np.diag([0.5, 0.0])
 
 mpc_params = {
     'model': lon_aircraft,
@@ -66,7 +66,8 @@ states = {
     'w': 0.0,
     'q': 0,
     'theta': np.deg2rad(-0.03),
-    'h': 0.0
+    'h': 0.0,
+    'x': 0.0,
 }
 
 controls = {
@@ -79,19 +80,23 @@ start_state = np.array([states['u'],
                         states['w'], 
                         states['q'], 
                         states['theta'],
-                        states['h']])
+                        states['h'], 
+                        states['x']])
 
 
 start_control = np.array([controls['delta_e'], 
                           controls['delta_t']])
 
 #terminal conditions
+goal_height = -20.0
 goal_theta = -7.2 
+goal_x = 250
 goal_state = np.array([25, 
                        0, 
                        np.deg2rad(0), 
                        np.deg2rad(goal_theta),
-                       0.0])
+                       goal_height, 
+                       goal_x])
 
 #begin mpc
 lon_mpc = LongitudinalMPC(mpc_params, lon_mpc_constraints)
@@ -110,7 +115,7 @@ control_results = lon_mpc.unpack_controls(control_results)
 state_results = lon_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 20 #seconds
+t_final = 10 #seconds
 idx_start = 1
 
 control_history = []
@@ -126,17 +131,18 @@ N = int(t_final/mpc_params['dt_val'])
 time_current = 0
 
 for i in range(N):
-    #print("iteration: ", i , "out of ", N)
-    #check the goal start after half the time
+
     if time_current > t_final/2:
         new_vel = 25
         new_theta = goal_theta
-        new_height = -45.0
+        new_height = 5.0
+        new_x = goal_x
         goal_state = np.array([new_vel, 
                                0, 
                                0.0, 
                                np.deg2rad(new_theta),
-                               0.0])
+                               new_height,
+                               new_x])
         
     lon_mpc.reinitStartGoal(start_state, goal_state)
 
@@ -152,7 +158,8 @@ for i in range(N):
                             state_results['w'][idx_start], 
                             state_results['q'][idx_start], 
                             state_results['theta'][idx_start],
-                            state_results['h'][idx_start]])
+                            state_results['h'][idx_start],
+                            state_results['x'][idx_start]])
     
     start_control = np.array([control_results['delta_e'][idx_start],
                                 control_results['delta_t'][idx_start]])
@@ -167,7 +174,12 @@ for i in range(N):
     inertial_vel = np.matmul(R, body_vel)
     
     inertial_pos = inertial_vel * mpc_params['dt_val']
+    print("inertial_pos: ", inertial_pos)
     inertial_pos = inertial_pos + np.array([x_original, y_original, z_original])
+    
+    #I was wrong this is the correct way to do it
+    inertial_pos[0] = start_state[5]
+    inertial_pos[2] = start_state[4]
     
     x_original = inertial_pos[0]
     y_original = inertial_pos[1]

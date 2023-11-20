@@ -30,6 +30,9 @@ class LongitudinalMPC(ModelPredictiveControl):
         # self.lbx['X'][4, :] = self.airplane_params['h_min']
         # self.ubx['X'][4, :] = self.airplane_params['h_max']
         
+        # self.lbx['X'][5, :] = self.airplane_params['x_min']
+        # self.ubx['X'][5, :] = self.airplane_params['x_max']
+        
     def unpack_controls(self, u:ca.DM) -> dict:
         """
         unpack the control variables
@@ -55,7 +58,8 @@ class LongitudinalMPC(ModelPredictiveControl):
             'w': np.array(x[1,:]),
             'q': np.array(x[2,:]),
             'theta': np.array(x[3,:]),
-            'h': np.array(x[4,:])}
+            'h': np.array(x[4,:]),
+            'x': np.array(x[5,:])}
 
         for k,v in state_dict.items():
             state_dict[k] = np.array(v).reshape(-1)

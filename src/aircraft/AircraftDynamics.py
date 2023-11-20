@@ -350,7 +350,6 @@ class AircraftDynamics():
         v_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, v_dot)
         w_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, w_dot)
         
-
         #velocities
         dcm_body_to_inertial = euler_dcm_body_to_inertial(phi, theta, psi)
         body_vel = np.array([u, v, w])
@@ -818,7 +817,8 @@ class AircraftCasadi():
     
 class LonAirPlane():
     """
-    
+    Linearized equations from this resource
+    https://control.asu.edu/Classes/MMAE441 /Aircraft/441Lecture10.pdf
     """
     def __init__(self, aircraft_params:dict) -> None:
         self.aircraft_params = aircraft_params
@@ -927,10 +927,12 @@ class LonAirPlane():
         c_theta = np.cos(theta_rad)
     
         if use_w == True:
-            constant = (u_airspeed_ms*s_theta) + (w*c_theta)
+            constant = (u_airspeed_ms*c_theta) + (w*c_theta)
+            constant2 = (u_airspeed_ms*s_theta) + (w*s_theta)
             alpha = np.arctan2(w, u_airspeed_ms)
         else:
-            constant = u_airspeed_ms*s_theta
+            constant = u_airspeed_ms*c_theta
+            constant2 = u_airspeed_ms*s_theta
             alpha = theta_rad
 
         #lift coefficient 
@@ -963,14 +965,17 @@ class LonAirPlane():
         M_w = (c_m_a * Q * s * c) / (Iyy*u_airspeed_ms)
         #M_q = (c_m_q) * c * Q * s * c / (2*Iyy*u_airspeed_ms*u_airspeed_ms)
         M_q = (c_m_q * c / (2 * u_airspeed_ms)) * (Q * s * c / Iyy);
+        
         c_theta = np.cos(theta_rad)
         s_theta = np.sin(theta_rad)
+        
         A = np.array([
-            [X_u, X_w, 0,            -G*c_theta, 0],
-            [Z_u, Z_w, Z_q,          -G*s_theta, 0],
-            [M_u, M_w, M_q,           0, 0],
-            [0 ,  0,   1,             0, 0],
-            [-s_theta ,  -c_theta,   0, constant, 0]])
+            [X_u, X_w, 0,            -G*c_theta, 0 , 0],
+            [Z_u, Z_w, Z_q,          -G*s_theta, 0,  0],
+            [M_u, M_w, M_q,           0, 0, 0],
+            [0 ,  0,   1,             0, 0, 0],
+            [-s_theta ,  c_theta,   0, constant, 0, 0],
+            [c_theta,    s_theta,   0, constant2, 0, 0]])
         
         return A 
     
@@ -1024,6 +1029,7 @@ class LonAirPlane():
                 [X_de, X_dt],
                 [Z_de, Z_deltathrust],
                 [M_de, 0],
+                [0  ,  0],
                 [0  ,  0],
                 [0  ,  0]
                 ]) 
@@ -1145,12 +1151,14 @@ class LonAirPlaneCasadi():
         self.q = ca.MX.sym('q')
         self.theta = ca.MX.sym('theta')
         self.h = ca.MX.sym('h')
+        self.x = ca.MX.sym('x')
         
         self.states = ca.vertcat(self.u, 
                                  self.w, 
                                  self.q, 
                                  self.theta,
-                                 self.h)
+                                 self.h, 
+                                 self.x)
         
         self.n_states = self.states.size()[0]
     
@@ -1234,7 +1242,6 @@ class LonAirPlaneCasadi():
         #remind Austin to add the mass term in first spreadsheet
         X_u = -(c_drag_u + (2*c_drag_0)) * Q * s / (m*u)
         X_w = -(c_drag_a - c_lift_0) * Q * s  / (m*u)
-        
         X_q = 0.0
         
         Z_u = -(c_lift_u + (2*c_lift_0)) * Q * s / (m*u)
@@ -1247,16 +1254,15 @@ class LonAirPlaneCasadi():
                 
         s_theta = ca.sin(theta)
         c_theta = ca.cos(theta)
-
         constant = (u*s_theta) + (w*c_theta)
-        
+    
         #create a casadi 5 x 5 matrix
         A = ca.vertcat(
             ca.horzcat(X_u, X_w, X_q,  -G*c_theta, 0),
             ca.horzcat(Z_u, Z_w, Z_q, -G*s_theta, 0),
             ca.horzcat(M_u, M_w, M_q, 0, 0),
             ca.horzcat(0 ,  0,   1,             0),
-            ca.horzcat(-s_theta ,  -c_theta,   0, constant, 0))
+            ca.horzcat(-s_theta ,  c_theta,   0, constant, 0))
                 
         self.A_function = ca.Function('compute_A',
                                     [self.states],
@@ -1298,7 +1304,6 @@ class LonAirPlaneCasadi():
         controls = ca.vertcat(self.delta_e, thrust)
         Bu = ca.mtimes(B, controls)  
 
-
         self.B_function = ca.Function('compute_B',
                                     [self.states, self.controls],
                                     [Bu],
@@ -1329,6 +1334,7 @@ class LonAirPlaneCasadi():
                             
         self.f = ca.Function('lon_dynamics', [self.states, self.controls], 
                                     [self.z_dot])
+        
 class LatAirPlane():
     """
     A = [
