@@ -1645,5 +1645,396 @@ class LatAirPlaneCasadi():
                                     [self.z_dot])
         
         
+class LinearizedAircraft():
+    def __init__(self, aircraft_params:dict) -> None:
+        self.aircraft_params = aircraft_params
+    
+    def lift_coeff(self, alpha:float) -> float:
+        """
+        Computes the lift coefficient with a linear and flat plate model
+        """
+        coefficient = self.aircraft_params
+        alpha0 = coefficient["alpha_stall"]
+        M = coefficient["mcoeff"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+
+        max_alpha_delta = 0.8
+        if alpha - alpha0 > max_alpha_delta:
+            alpha = alpha0 + max_alpha_delta
+        elif alpha0 - alpha > max_alpha_delta:
+            alpha = alpha0 - max_alpha_delta
+
+        sigmoid = (1 + np.exp(-M * (alpha - alpha0)) + \
+                   np.exp(M * (alpha + alpha0))) / (1 + math.exp(-M * (alpha - alpha0))) \
+                    / (1 + math.exp(M * (alpha + alpha0)))
+        linear = (1.0 - sigmoid) * (c_lift_0 + c_lift_a0 * alpha)  # Lift at small AoA
+        flat_plate = sigmoid * (2 * math.copysign(1, alpha) * math.pow(math.sin(alpha), 2) * math.cos(alpha))  # Lift beyond stall
+
+        return linear + flat_plate
+    
+    def drag_coeff(self, alpha:float) -> float:
+        """
+        computes the induced drag coefficient with a linear and flat plate model
+        https://www.grc.nasa.gov/www/k-12/VirtualAero/BottleRocket/airplane/induced.html
+        """
+        coefficient = self.aircraft_params
+        b = coefficient["b"]
+        s = coefficient["s"]
+        c_drag_p = coefficient["c_drag_p"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+        oswald = coefficient["oswald"]
         
+        ar = pow(b, 2) / s
+        c_drag_a = c_drag_p + pow(c_lift_0 + c_lift_a0 * alpha, 2) / (np.pi * oswald * ar)
+
+        return c_drag_a
+    
+    def compute_A_lon(self, u_airspeed_ms:float,
+                  theta_rad:float, 
+                  use_w:bool=False,
+                  w:float=0.0) -> np.ndarray:
+        """
+        Computes the A matrix for the aircraft
+        without the speed term should be a 5 x 5 matrix
         
+        States are as follows:
+        [u, w, q, theta, z]
+        
+        Takes in the body u velocity in m/s and the pitch angle in radians
+        Pitch angle is in radians with up being positive in the body frame
+        """
+        
+        RHO = Config.RHO
+        G = Config.G
+        Q = 0.5 * RHO * u_airspeed_ms**2
+        m = self.aircraft_params['mass']
+        s = self.aircraft_params['s']
+        c = self.aircraft_params['c']
+        b = self.aircraft_params['b']
+        
+        # Ixx = self.aircraft_params['Ixx']
+        Iyy = self.aircraft_params['Iyy']
+        # Izz = self.aircraft_params['Izz']
+        
+        # c_m_0 = self.aircraft_params['c_m_0']
+        c_m_a = self.aircraft_params['c_m_a']
+        c_m_q = self.aircraft_params['c_m_q']
+        # c_m_deltae = self.aircraft_params['c_m_deltae']
+        
+        c_lift_0 = self.aircraft_params['c_lift_0']
+        
+        if 'c_drag_0' in self.aircraft_params:
+            c_drag_0 = self.aircraft_params['c_drag_0']
+        else:
+            c_drag_0 = 0.0
+        # c_drag_a = self.aircraft_params['c_drag_a']
+        
+        if 'c_lift_u' not in self.aircraft_params:
+            c_lift_u = 0.0
+        else:
+            c_lift_u = self.aircraft_params['c_lift_u']
+        
+        c_lift_a = self.aircraft_params['c_lift_a']
+        
+        #aspect ratio
+        ar = np.power(b,2)/s
+        
+        c_drag_p = self.aircraft_params['c_drag_p']
+    
+        #check if oswald exists in the dictionary
+        if 'oswald' in self.aircraft_params:
+            oswald = self.aircraft_params['oswald']
+        else:
+            oswald = 0.7
+    
+        s_theta = np.sin(theta_rad)
+        c_theta = np.cos(theta_rad)
+    
+        if use_w == True:
+            constant = (u_airspeed_ms*c_theta) + (w*c_theta)
+            constant2 = (u_airspeed_ms*s_theta) + (w*s_theta)
+            alpha = np.arctan2(w, u_airspeed_ms)
+        else:
+            constant = u_airspeed_ms*c_theta
+            constant2 = u_airspeed_ms*s_theta
+            alpha = theta_rad
+
+        #lift coefficient 
+        #C_l = (m*G / (Q*s)) * alpha
+        # C_l = self.lift_coeff(alpha)
+
+        # c_drag_a = c_drag_p + np.power(c_lift_0 + c_lift_a*alpha,2) / \
+        #     (np.pi * oswald * ar)
+        # k = 1/(np.pi) * oswald * ar
+        # k = 1/np.pi * 6 * 0.7 # wtf is this 
+        
+        # c_drag_a = k * (C_l)**2             
+        c_drag_a = self.drag_coeff(alpha)
+        
+        #check if c_drag_u exists in the dictionary
+        if 'c_drag_u' in self.aircraft_params:
+            c_drag_u = self.aircraft_params['c_drag_u']
+        else:
+            c_drag_u = 0.0
+        
+        #remind Austin to add the mass term in first spreadsheet
+        X_u = -(c_drag_u + 2*c_drag_0) * Q * s / (m*u_airspeed_ms)
+        X_w = -(c_drag_a - c_lift_0) * Q * s  / (m*u_airspeed_ms)
+        
+        Z_u = -(c_lift_u + (2*c_lift_0)) * Q * s / (m*u_airspeed_ms)
+        Z_w = -(c_lift_a + c_drag_0) * Q * s / (m*u_airspeed_ms)
+        Z_q = u_airspeed_ms #THIS IS WEIRD
+                
+        M_u = 0.0 
+        M_w = (c_m_a * Q * s * c) / (Iyy*u_airspeed_ms)
+        #M_q = (c_m_q) * c * Q * s * c / (2*Iyy*u_airspeed_ms*u_airspeed_ms)
+        M_q = (c_m_q * c / (2 * u_airspeed_ms)) * (Q * s * c / Iyy);
+        
+        c_theta = np.cos(theta_rad)
+        s_theta = np.sin(theta_rad)
+        
+        A = np.array([
+            [X_u, X_w, 0,          -G*c_theta, 0 , 0], #u
+            [Z_u, Z_w, Z_q,        -G*s_theta, 0,  0], #w
+            [M_u, M_w, M_q,         0, 0, 0],          #q
+            [0 ,  0,   1,           0, 0, 0],          #theta
+            [-s_theta ,  c_theta,   0, constant, 0, 0],  #z
+            [c_theta,    s_theta,   0, constant2, 0, 0]  #x
+            ])
+        
+        # extend 6 more columns for the lateral states  
+        A_lon = np.hstack((A, np.zeros((A.shape[0], 6))))
+        
+        return A_lon
+        
+    def compute_A_lat(self, velocity:float,
+                      theta_rad:float) -> np.ndarray:
+        
+        Q = 0.5 * Config.RHO * velocity**2
+        m = self.aircraft_params['mass']
+        s = self.aircraft_params['s']
+        b = self.aircraft_params['b']
+        
+        c_y_b = self.aircraft_params['c_y_b']
+        c_y_p = self.aircraft_params['c_y_p']
+        
+        c_y_r = self.aircraft_params['c_y_r']
+        c_l_b = self.aircraft_params['c_l_b']
+        
+        c_l_p = self.aircraft_params['c_l_p']
+        c_l_r = self.aircraft_params['c_l_r']
+        c_n_b = self.aircraft_params['c_n_b']
+        c_n_p = self.aircraft_params['c_n_p']
+        c_n_r = self.aircraft_params['c_n_r']
+        c_n_deltar = self.aircraft_params['c_n_deltar']
+        
+        Ix = self.aircraft_params['Ixx']
+        Iz = self.aircraft_params['Izz']
+        
+        Y_beta = Q * s * c_y_b / m
+        Y_p = Q * s * b * c_y_p / (2 * m * velocity)
+        Y_r = Q * s * b * c_y_r / (2 * m * velocity)
+        
+        L_beta = Q * s * b * c_l_b / Ix
+        L_p = Q * s * b**2 * c_l_p / (2 * Ix * velocity)
+        L_r =  Q * s * b**2 * c_l_r / (2 * Ix  * velocity)
+
+        N_beta = Q * s * b * c_n_b / Iz;
+        N_p = Q * s * b**2 * c_n_p / (2 * Iz * velocity)
+        N_r = Q * s * b**2 * c_n_r / (2 * Iz * velocity)
+        N_dr = Q * s * b * c_n_deltar / Iz;
+        
+        G = Config.G
+        c_theta = np.cos(theta_rad)
+        s_theta = np.sin(theta_rad)
+        
+        # c_phi = np.cos(phi_rad)
+        # s_phi = np.sin(phi_rad)
+        
+        tan_theta = np.tan(theta_rad)
+        sec_theta = 1 / c_theta
+        
+        A = np.array([
+            [Y_beta,           Y_p,      -(velocity - Y_r),  (G*c_theta),      0,    0], #v
+            [L_beta,           L_p,            L_r,           0,               0,    0], #p 
+            [N_beta,           N_p,            N_r,           0,               0,    0], #r
+            [0,                 1,             tan_theta,     0,               0,    0], #phi
+            [0,                 0,             sec_theta,     0,               0,    0], #psi
+            [1,                 0,             0,             velocity*c_theta,0,    0]  #y
+            ])
+
+        A_lat = np.hstack((np.zeros((A.shape[0], 6)), A))        
+
+        return A_lat        
+
+    def compute_A_full(self, airspeed:float, theta_rad:float,
+                   w_speed:float) -> np.ndarray:
+        A_lon = self.compute_A_lon(airspeed, theta_rad, True, w_speed)
+        A_lat = self.compute_A_lat(airspeed, theta_rad)
+        
+        #combine the two matrices
+        A_full = np.vstack((A_lon, A_lat))
+        
+        return A_full
+    
+    def compute_B_lon(self, u_airspeed_ms:float) -> np.ndarray:
+        """
+        Computes the static B matrix for the aircraft
+        without the speed term should be a 5 x 2 matrix
+        
+        Takes in the body u velocity in m/s and the pitch angle in radians
+        Pitch angle is in radians with up being positive in the body frame
+        """
+        s = self.aircraft_params['s']
+        c = self.aircraft_params['c']
+
+        Iyy = self.aircraft_params['Iyy']
+        c_m_deltae = self.aircraft_params['c_m_deltae']
+        c_lift_deltae = self.aircraft_params['c_lift_deltae']
+        
+        #remind Austin to add the mass term in first spreadsheet
+        m = self.aircraft_params['mass']
+        RHO = Config.RHO
+        
+        G = Config.G
+        Q = 0.5 * RHO * u_airspeed_ms**2
+
+        Z_de = -c_lift_deltae * Q * s / (m*u_airspeed_ms)
+        Z_deltathrust = 0.0
+                
+        X_de = 0.0
+        X_dt = 1/(m)
+        
+        Z_de = -Q * c_lift_deltae * s / m
+        M_de = -c_m_deltae * (Q * s * c) /(Iyy) 
+        
+        B = np.array([
+            [X_de, X_dt],
+            [Z_de, Z_deltathrust],
+            [M_de, 0],
+            [0  ,  0],
+            [0  ,  0],
+            [0  ,  0]
+            ]) 
+        
+        #extend to 6 more rows for the lateral states
+        B_lon = np.vstack((B, np.zeros((6, B.shape[1]))))
+    
+        return B_lon
+    
+    def compute_B_lat(self, velocity:float)->np.ndarray:
+        """
+        computes the B lateral matrix of the aircraft
+        """
+        Q = 0.5 * Config.RHO * velocity**2
+        s = self.aircraft_params['s']
+        b = self.aircraft_params['b']
+        m = self.aircraft_params['mass']
+        
+        Ix = self.aircraft_params['Ixx']
+        Iz = self.aircraft_params['Izz']
+        
+        c_l_da = self.aircraft_params['c_l_deltaa']
+        c_y_dr = self.aircraft_params['c_y_deltar']
+        
+        c_l_dr = self.aircraft_params['c_l_deltar']
+        c_n_da = self.aircraft_params['c_n_deltaa']
+        c_n_dr = self.aircraft_params['c_n_deltar']
+        
+        L_da = Q * s * b * c_l_da / Ix;
+        L_dr = Q * s * b * c_l_dr / Ix;
+        
+        N_da = Q * s * b * c_n_da / Iz;
+        N_dr = Q * s * b * c_n_dr / Iz;
+        
+        Ydr = Q * s * c_y_dr / m;
+        
+        B = np.array([[0.0 , Ydr/velocity],
+             [L_da, L_dr],
+             [N_da, N_dr],
+             [0.0 , 0.0], 
+             [0.0 ,  0.0],
+             [0.0 ,  0.0]])
+                
+        B_lat = np.vstack((np.zeros((6, B.shape[1])), B))
+        
+        return B_lat
+
+    def compute_B_full(self, velocity:float)->np.ndarray:
+        """
+        
+        """        
+        B_lon = self.compute_B_lon(velocity)
+        B_lat = self.compute_B_lat(velocity)
+        
+        #combine the two matrices
+        B_full = np.hstack((B_lon, B_lat))
+        
+        return B_full
+    
+    def compute_derivatives(self, 
+                            input_elevator_rad:float,
+                            input_thrust:float,
+                            input_aileron_rad:float,
+                            input_rudder_rad:float,
+                            states:np.ndarray,
+                            A:np.ndarray,
+                            B:np.ndarray) -> np.ndarray:
+        
+        thrust_scale = self.aircraft_params['mass'] * 9.81 / \
+            Config.HOVER_THROTTLE
+            
+        input_thrust = input_thrust * thrust_scale
+        
+        controls = np.array([input_elevator_rad, input_thrust,
+                             input_aileron_rad, input_rudder_rad])
+        
+        x_dot = np.matmul(A, states) + np.matmul(B, controls)
+        
+        return x_dot
+    
+    def rk45(self,
+            input_elevator_rad:float,
+            input_thrust:float,
+            input_aileron_rad:float,
+            input_rudder_rad:float,
+            states:np.ndarray, A:np.ndarray,
+            B:np.ndarray,
+            delta_time:float) -> np.ndarray:
+        """
+        Simulates the aircraft using the Runge-Kutta 4th order method 
+        """
+        #get the current states
+        current_states = states
+
+        #compute the derivatives
+        k1 = delta_time * self.compute_derivatives(input_elevator_rad,
+                                        input_thrust,
+                                        input_aileron_rad,
+                                        input_rudder_rad,
+                                        current_states, A, B)
+        
+        k2 = delta_time * self.compute_derivatives(input_elevator_rad,
+                                        input_thrust,
+                                        input_aileron_rad,
+                                        input_rudder_rad,
+                                        current_states + k1/2, A, B)
+        
+        k3 = delta_time * self.compute_derivatives(input_elevator_rad,
+                                        input_thrust,
+                                        input_aileron_rad,
+                                        input_rudder_rad,
+                                        current_states + k2/2, A, B)
+        
+        k4 = delta_time * self.compute_derivatives(input_elevator_rad,
+                                        input_thrust,
+                                        input_aileron_rad,
+                                        input_rudder_rad,
+                                        current_states + k3, A, B)
+        
+        new_states = current_states + (k1 + 2*k2 + 2*k3 + k4) / 6
+        
+        return new_states
+                
