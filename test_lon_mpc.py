@@ -31,17 +31,19 @@ with open('A.pkl', 'rb') as f:
 with open('B.pkl', 'rb') as f:
     B_lon = pkl.load(f)
 
-lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
-                                 A_lon, True, B_lon)
+# lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
+#                                  A_lon, True, B_lon)
+
+lon_aircraft = LonAirPlaneCasadi(airplane_params)
 lon_aircraft.set_state_space()
 
-Q = np.diag([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
-R = np.diag([0.5, 0.0])
+Q = np.diag([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+R = np.diag([0.0, 0.0])
 
 mpc_params = {
     'model': lon_aircraft,
     'dt_val': 0.05,
-    'N': 15,
+    'N': 10,
     'Q': Q,
     'R': R,
 }
@@ -51,10 +53,10 @@ lon_mpc_constraints = {
     'delta_e_max': np.deg2rad(30),
     'delta_t_min': 0.05,
     'delta_t_max': 0.75,
-    'u_min': 15,
+    'u_min': 20,
     'u_max': 35,
-    'w_min': -0.5,
-    'w_max': 0.5,
+    'w_min': -10,
+    'w_max': 10,
     'q_min': np.deg2rad(-60),
     'q_max': np.deg2rad(60),
     'theta_min': np.deg2rad(-35),
@@ -72,7 +74,7 @@ states = {
 
 controls = {
     'delta_e': np.deg2rad(0),
-    'delta_t': 0.1,
+    'delta_t': 0.15,
 }
 
 #starting conditions -> wrap this to a function or something
@@ -115,7 +117,7 @@ control_results = lon_mpc.unpack_controls(control_results)
 state_results = lon_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 10 #seconds
+t_final = 5 #seconds
 idx_start = 1
 
 control_history = []
@@ -133,7 +135,7 @@ time_current = 0
 for i in range(N):
 
     if time_current > t_final/2:
-        new_vel = 35
+        new_vel = 25
         new_theta = goal_theta
         new_height = 5.0
         new_x = goal_x

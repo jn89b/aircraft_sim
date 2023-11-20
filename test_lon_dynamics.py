@@ -23,7 +23,7 @@ max_input = delta_e_cmd
 
 init_controls = {
     'delta_e': np.deg2rad(delta_e_cmd),
-    'delta_t': 0.124,
+    'delta_t': 0.15,
 }
 
 A = lon_airplane.compute_A(init_states['u'], 
@@ -82,12 +82,12 @@ for i in range(N):
         delta_e_cmd = np.deg2rad(max_input)
     
     
-    # A = lon_airplane.compute_A(states[0],
-    #                              states[3],
-    #                              True,
-    #                              states[1])
+    A = lon_airplane.compute_A(states[0],
+                                 states[3],
+                                 True,
+                                 states[1])
     
-    # B = lon_airplane.compute_B(states[0])
+    B = lon_airplane.compute_B(states[0])
 
     controls = np.array([delta_e_cmd,
                         init_controls['delta_t']])

@@ -29,7 +29,6 @@ init_states = {
     'y': 0.0,
 }
 
-
 input_elevator = np.deg2rad(9.67)
 input_throttle = 0.124
 input_aileron = np.deg2rad(0)
@@ -65,7 +64,7 @@ with open('A_full.pkl', 'wb') as f:
 with open('B_full.pkl', 'wb') as f:
     pkl.dump(B_full, f)
 
-states = np.array([init_states['u'],
+states = np.array([  init_states['u'],
                      init_states['w'],
                      init_states['q'],
                      init_states['theta'],

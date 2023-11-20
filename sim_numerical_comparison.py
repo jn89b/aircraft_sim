@@ -27,7 +27,7 @@ if __name__=="__main__":
     if use_csv_for_init == False:
             
         init_states = {'x':0.0, 'y':0.0, 'z':0.0,
-                    'u':21.0, 'v':0.0, 'w':0.0,
+                    'u':25.0, 'v':0.0, 'w':0.0,
                     'phi':0.0, 'theta':0.0, 'psi':0.0,
                     'p':0.0, 'q':0.0, 'r':0.0}
         
@@ -50,11 +50,11 @@ if __name__=="__main__":
         
         
         init_states = {'x':0.0, 'y':0.0, 'z':0.0,
-                    'u':18.0, 'v':0.0, 'w':0.578,
+                    'u':25.0, 'v':0.0, 'w':0.0,
                     'phi':0.0, 'theta':np.deg2rad(0.0306), 'psi':0.0,
                     'p':0.0, 'q':0.0, 'r':0.0}
         
-        controls = {'delta_e':np.deg2rad(10.93), 
+        controls = {'delta_e':np.deg2rad(0.0), 
                     'delta_a':np.deg2rad(0.0), 
                     'delta_r':np.deg2rad(0.0), 
                     'delta_t':0.128}
@@ -74,7 +74,7 @@ if __name__=="__main__":
 
     dt = 0.01        
     t_init = 0.0
-    t_final = 30.0
+    t_final = 5.0
     N = int((t_final - t_init) / dt)
     print(N)
     # N = 100
@@ -87,8 +87,18 @@ if __name__=="__main__":
     euler_states = []
     rk_states = []
 
-    for i in range(N):
+    use_linear_csv = True
+    if use_linear_csv == True:
+        controls_df = pd.read_csv("MPC_Plane_controls.csv")
+        states_df = pd.read_csv("MPC_Plane_states.csv")
 
+    for i in range(N):
+        if use_linear_csv == True:
+            input_aileron = controls_df['delta_a'][i]
+            input_elevator = controls_df['delta_e'][i]
+            input_rudder = controls_df['delta_r'][i]
+            input_throttle = controls_df['delta_t'][i]
+        
         new_states_eulers = aircraft_dynamics_eulers.eulers(
             input_aileron,
             input_elevator,
@@ -168,6 +178,11 @@ if __name__=="__main__":
     
     ax2.plot(euler_states['x'], euler_states['y'], euler_states['z'], 'o-',
                 label='Euler')  
+    if use_linear_csv == True:
+        ax2.plot(states_df['x'], states_df['y'], -states_df['h'], 'x-',
+                label='Linear')
+        
+    ax2.legend()
     
     #format axis to be same scale
     max_range = np.array([euler_states['x'].max()-euler_states['x'].min(),
@@ -178,15 +193,20 @@ if __name__=="__main__":
     mid_y = (euler_states['y'].max()+euler_states['y'].min()) * 0.5
     mid_z = (euler_states['z'].max()+euler_states['z'].min()) * 0.5
     
-    ax2.set_xlim(mid_x - max_range, mid_x + max_range)
-    ax2.set_ylim(mid_y - max_range, mid_y + max_range)
-    ax2.set_zlim(mid_z - max_range, mid_z + max_range)
+    # ax2.set_xlim(mid_x - max_range, mid_x + max_range)
+    # ax2.set_ylim(mid_y - max_range, mid_y + max_range)
+    # ax2.set_zlim(mid_z - max_range, mid_z + max_range)
     
     #plot body velocities
     fig3, ax3 = plt.subplots(3,1,sharex=True)
     ax3[0].plot(time_vec, euler_states['u'], label='Euler')
-    ax3[0].plot(time_vec, rk_states['u'], label='RK45')
+    # ax3[0].plot(time_vec, rk_states['u'], label='RK45')
+    if use_linear_csv == True:
+        ax3[0].plot(time_vec, states_df['u'], label='Linear')
+    
     ax3[0].set_ylabel('u (m/s)')
+    ax3[0].legend()
+    
     ax3[1].plot(time_vec, euler_states['v'], label='Euler')
     ax3[1].plot(time_vec, rk_states['v'], label='RK45')
     ax3[1].set_ylabel('v (m/s)')
