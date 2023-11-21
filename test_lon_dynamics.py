@@ -5,15 +5,18 @@ import numpy as np
 import pickle as pkl
 #https://aircraftflightmechanics.com/Linearisation/LinearvsNonlinear.html
 
+#0.00638298 for first row of Bu matrix
+
+
 df = pd.read_csv("SIM_Plane_h_vals.csv")
 airplane_params = get_airplane_params(df)
 lon_airplane = LonAirPlane(airplane_params)
 
 init_states = {
     'u': 25,
-    'w': 0.924,
+    'w': 0.0,
     'q': 0,
-    'theta': np.deg2rad(-0.002),
+    'theta': np.deg2rad(-0.03),
     'h': 0.0,
     'x': 0.0,
 }
@@ -82,12 +85,12 @@ for i in range(N):
         delta_e_cmd = np.deg2rad(max_input)
     
     
-    A = lon_airplane.compute_A(states[0],
-                                 states[3],
-                                 True,
-                                 states[1])
+    # A = lon_airplane.compute_A(states[0],
+    #                              states[3],
+    #                              True,
+    #                              states[1])
     
-    B = lon_airplane.compute_B(states[0])
+    # B = lon_airplane.compute_B(states[0])
 
     controls = np.array([delta_e_cmd,
                         init_controls['delta_t']])

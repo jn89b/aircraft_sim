@@ -1165,7 +1165,6 @@ class LonAirPlaneCasadi():
         
         self.thrust_scale = self.aircraft_params['mass'] * 9.81 / \
             Config.HOVER_THROTTLE
-            
         self.delta_e = ca.MX.sym('delta_e')
         self.delta_thrust = ca.MX.sym('delta_thrust')
         self.controls = ca.vertcat(self.delta_e, 
@@ -1218,14 +1217,11 @@ class LonAirPlaneCasadi():
         return linear + flat_plate
     
     def compute_A(self) -> None:
-
+        
         u = self.states[0]
         w = self.states[1]
-        
-        # airspeed = ca.sqrt(u**2 + w**2)
-        
-        # q = self.states[2]
         theta = self.states[3]
+    
         # alpha_rad = ca.if_else(u < 1e-2, 0.0 , ca.atan2(w, u))
         alpha_rad = ca.atan2(w, u)
         RHO = Config.RHO
@@ -1307,7 +1303,6 @@ class LonAirPlaneCasadi():
 
         constant = (u*c_theta) + (w*c_theta)
         constant2 = (u*s_theta) + (w*s_theta)
-
         #create a casadi 5 x 5 matrix
         A = ca.vertcat(
             ca.horzcat(X_u, X_w,  0,         -G*c_theta,    0, 0),
@@ -1360,7 +1355,13 @@ class LonAirPlaneCasadi():
         controls = ca.vertcat(self.delta_e, self.thrust)
         Bu = ca.mtimes(B, controls)  
 
-        self.B_function = ca.Function('compute_B',
+        self.get_B = ca.Function('compute_B',
+                                    [self.states, self.controls],
+                                    [B],
+                                    ['lon_states', 'controls'], ['B'])
+        
+
+        self.B_function = ca.Function('compute_Bu',
                                     [self.states, self.controls],
                                     [Bu],
                                     ['B_states', 'controls'], ['Bu'])
@@ -1374,6 +1375,7 @@ class LonAirPlaneCasadi():
         if self.use_own_A == False:
             A = self.A_function(self.states)
         else:
+            # self.A = A
             A = self.A
             
         if self.use_own_B == False:
@@ -1389,7 +1391,6 @@ class LonAirPlaneCasadi():
         #Bu = self.B_function(self.states, self.controls)
                         
         self.z_dot = ca.mtimes(A, self.states) + Bu
-                            
         self.f = ca.Function('lon_dynamics', [self.states, self.controls], 
                                     [self.z_dot])
         

@@ -81,10 +81,10 @@ class ModelPredictiveControl():
         R = self.R
         n_states = self.n_states
         
+        #if exists A matrix, use it
         #compute cost function for error between current and target state
         # self.cost_fn = (self.X[:, -1] - P[n_states:]).T @ Q @ (self.X[:, -1] - P[n_states:])  \
         #                 + self.U[:, -1].T @ R @ self.U[:, -1]       
-
         for k in range(self.N):
             states = self.X[:, k]
             controls = self.U[:, k]
@@ -198,7 +198,8 @@ class ModelPredictiveControl():
         return next_t, next_state, next_control
 
 
-    def solveMPCRealTimeStatic(self, start, goal, controls, init_solver:bool=True):
+    def solveMPCRealTimeStatic(self, start, goal, controls, init_solver:bool=True,
+                               update_A:bool=False, A:np.ndarray=None, B:np.ndarray=None):
         """solve the mpc based on initial and desired location"""
         n_states = self.model.n_states
         n_controls = self.model.n_controls
@@ -215,7 +216,13 @@ class ModelPredictiveControl():
         """Jon's advice consider velocity of obstacle at each knot point"""
         #moving target in the y direction
         self.state_target = ca.DM(goal) 
-
+        
+        if update_A==True:
+            self.model.A = A
+            self.f = self.model.f
+            # self.model.B = B
+            # self.f = self.model.f
+        
         if init_solver == True:
             self.initSolver()
 
