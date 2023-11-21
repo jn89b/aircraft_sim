@@ -3,3 +3,4 @@
 - pip3 install controls
 - pip3 install seaborn
 - pip3 install numpy 
+- pip3 install slycot

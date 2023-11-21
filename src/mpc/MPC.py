@@ -219,8 +219,8 @@ class ModelPredictiveControl():
         
         if update_A==True:
             self.model.A = A
+            self.model.B = B
             self.f = self.model.f
-            # self.model.B = B
             # self.f = self.model.f
         
         if init_solver == True:

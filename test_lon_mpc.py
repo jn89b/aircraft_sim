@@ -18,27 +18,26 @@ full_path = folder_dir + file_name
 # A_lon,B_lon = read_lon_matrices(full_path)
 df = pd.read_csv("SIM_Plane_h_vals.csv")
 airplane_params = get_airplane_params(df)
-# lon_airplane = LonAirPlane(airplane_params)
-# u_0 = 20
-# theta_0 = 0
-# A_lon = lon_airplane.compute_A(u_0, theta_0)
-# B_lon = lon_airplane.compute_B(u_0)
+lon_airplane_dyamics = LonAirPlane(airplane_params)
+u_0 = 25
+theta_0 = 0
+A_lon = lon_airplane_dyamics.compute_A(u_0, theta_0)
+B_lon = lon_airplane_dyamics.compute_B(u_0)
 
-#load the matrices
+# #load the matrices
+# s
 with open('A.pkl', 'rb') as f:
     A_lon = pkl.load(f)
-    
+
 with open('B.pkl', 'rb') as f:
     B_lon = pkl.load(f)
 
-# lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
-#                                  A_lon, True, B_lon)
-
-lon_aircraft = LonAirPlaneCasadi(airplane_params)
+lon_aircraft = LonAirPlaneCasadi(airplane_params, True,
+                                 A_lon, True, B_lon)
 lon_aircraft.set_state_space()
 
-Q = np.diag([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-R = np.diag([0.0, 0.0])
+Q = np.diag([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+R = np.diag([0.03, 0.0])
 
 mpc_params = {
     'model': lon_aircraft,
@@ -72,7 +71,8 @@ states = {
     'x': 0.0,
 }
 
-delta_e_cmd = 9.67
+# did this help?? The trim condition for elevator
+delta_e_cmd = 0.0
 controls = {
     'delta_e': np.deg2rad(delta_e_cmd),
     'delta_t': 0.15,
@@ -91,10 +91,10 @@ start_control = np.array([controls['delta_e'],
                           controls['delta_t']])
 
 #terminal conditions
-goal_height = -20.0
-goal_theta = -7.2 
+goal_height = 10.0
+goal_theta = -30.0
 goal_x = 250
-goal_state = np.array([25, 
+goal_state = np.array([35, 
                        0, 
                        np.deg2rad(0), 
                        np.deg2rad(goal_theta),
@@ -118,7 +118,7 @@ control_results = lon_mpc.unpack_controls(control_results)
 state_results = lon_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 5 #seconds
+t_final = 20 #seconds
 idx_start = 1
 
 control_history = []
@@ -141,29 +141,14 @@ states = np.array([states['u'],
                         states['x']])
 controls = np.array([controls['delta_e'],
                         controls['delta_t']])
-
-A_lon = lon_aircraft.A_function(states)
-
-#convert to numpy array
-A_lon = np.array(A_lon)
-
-B_lon = lon_aircraft.get_B(states, controls)
-
-
-Bu = np.matmul(np.array(B_lon), controls)
-
-Bu_casadi = lon_aircraft.B_function(states, controls)
-
-#convert to numpy array
-Bu_casadi = np.array(Bu_casadi)
             
 #%% 
 for i in range(N):
 
     if time_current > t_final/2:
-        new_vel = 30
+        new_vel = 35
         new_theta = goal_theta
-        new_height = 5.0
+        new_height = 0.0
         new_x = goal_x
         goal_state = np.array([new_vel, 
                                0, 
@@ -175,7 +160,7 @@ for i in range(N):
     lon_mpc.reinitStartGoal(start_state, goal_state)
 
     control_results, state_results = lon_mpc.solveMPCRealTimeStatic(
-        start_state, goal_state, start_control, False, True, A_lon)
+        start_state, goal_state, start_control, False, True, A_lon, B_lon)
     
     #unpack the results
     control_results = lon_mpc.unpack_controls(control_results)
@@ -192,18 +177,12 @@ for i in range(N):
     start_control = np.array([control_results['delta_e'][idx_start],
                                 control_results['delta_t'][idx_start]])
     
+    A_lon = lon_airplane_dyamics.compute_A(start_state[0], 
+                                   start_state[3], 
+                                   True, 
+                                   start_state[1])
     
-    #update the A and B matrices
-    # A_lon = lon_airplane.compute_A(state_results['u'][idx_start], 
-    #                                state_results['theta'][idx_start])
-    # B_lon = lon_airplane.compute_B(state_results['u'][idx_start])
-
-    # lon_aircraft.A = A_lon
-    # lon_aircraft.B = B_lon    
-    # lon_mpc.model = lon_aircraft
-    
-    # lon_mpc.computeCost()
-
+    # B_lon = lon_airplane_dyamics.compute_B(start_state[0])
     
     #store the result in history
     state_history.append(start_state)
@@ -214,8 +193,8 @@ for i in range(N):
     inertial_vel = np.matmul(R, body_vel)
     
     inertial_pos = inertial_vel * mpc_params['dt_val']
-    # print("inertial_pos: ", inertial_pos)
     inertial_pos = inertial_pos + np.array([x_original, y_original, z_original])
+    print("inertial_pos: ", inertial_pos)
     
     #I was wrong this is the correct way to do it
     inertial_pos[0] = start_state[5]

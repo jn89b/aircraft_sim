@@ -927,8 +927,8 @@ class LonAirPlane():
         c_theta = np.cos(theta_rad)
     
         if use_w == True:
-            constant = (u_airspeed_ms*c_theta) + (w*c_theta)
-            constant2 = (u_airspeed_ms*s_theta) + (w*s_theta)
+            constant = (u_airspeed_ms*c_theta) #+ (w*c_theta)
+            constant2 = (u_airspeed_ms*s_theta) #+ (w*s_theta)
             alpha = np.arctan2(w, u_airspeed_ms)
         else:
             constant = u_airspeed_ms*c_theta
@@ -944,8 +944,8 @@ class LonAirPlane():
         k = 1/(np.pi) * oswald * ar
         # k = 1/np.pi * 6 * 0.7 # wtf is this 
         
-        # c_drag_a = k * (C_l)**2             
-        c_drag_a = self.drag_coeff(alpha)
+        c_drag_a = k * (C_l)**2*alpha**2 + c_drag_0             
+        #c_drag_a = self.drag_coeff(alpha)
         
         #check if c_drag_u exists in the dictionary
         if 'c_drag_u' in self.aircraft_params:
@@ -966,16 +966,13 @@ class LonAirPlane():
         #M_q = (c_m_q) * c * Q * s * c / (2*Iyy*u_airspeed_ms*u_airspeed_ms)
         M_q = (c_m_q * c / (2 * u_airspeed_ms)) * (Q * s * c / Iyy);
         
-        c_theta = np.cos(theta_rad)
-        s_theta = np.sin(theta_rad)
-        
         A = np.array([
             [X_u, X_w, 0,            -G*c_theta, 0 , 0], #u
             [Z_u, Z_w, Z_q,          -G*s_theta, 0,  0], #w
             [M_u, M_w, M_q,           0, 0, 0],          #q
             [0 ,  0,   1,             0, 0, 0],          #theta
-            [-s_theta ,  c_theta,   0, constant, 0, 0],  #z
-            [c_theta,    s_theta,   0, constant2, 0, 0]  #x
+            [-s_theta ,  c_theta,   0, -constant, 0, 0],  #z
+            [c_theta,    s_theta,   0, -constant2, 0, 0]  #x
             ])
         
         return A 
@@ -1380,6 +1377,13 @@ class LonAirPlaneCasadi():
             
         if self.use_own_B == False:
             Bu = self.B_function(self.states, self.controls)
+            # B = self.B
+            # #normalize thrust to newtons
+            # thrust_scale =  self.aircraft_params['mass'] * 9.81 / \
+            # Config.HOVER_THROTTLE
+            # thrust = self.controls[1] * thrust_scale
+            # controls = ca.vertcat(self.delta_e, thrust)
+            #Bu = ca.mtimes(B, controls)
         else:
             B = self.B
             #normalize thrust to newtons
@@ -1921,7 +1925,7 @@ class LinearizedAircraft():
             [N_beta,           N_p,            N_r,           0,               0,    0], #r
             [0,                 1,             tan_theta,     0,               0,    0], #phi
             [0,                 0,             sec_theta,     0,               0,    0], #psi
-            [1,                 0,             0,             0,               -velocity*c_theta,    0]  #y
+            [1,                 0,             0,             0,               velocity*c_theta,    0]  #y
             ])
 
         A_lat = np.hstack((np.zeros((A.shape[0], 6)), A))        

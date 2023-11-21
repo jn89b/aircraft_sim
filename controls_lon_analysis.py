@@ -13,11 +13,12 @@ airplane_params = get_airplane_params(df)
 lon_airplane = LonAirPlane(airplane_params)
 
 init_states = {
-    'u': 25,
+    'u': 15,
     'w': 0.729,
     'q': 0,
     'theta': np.deg2rad(8),
     'h': 0.0,
+    'x': 0.0,
 }
 
 delta_e_cmd = np.deg2rad(10.0)
@@ -37,7 +38,8 @@ states = np.array([init_states['u'],
                      init_states['w'],
                      init_states['q'],
                      init_states['theta'],
-                     init_states['h']])
+                     init_states['h'],
+                     init_states['x']])
 
 print("A",A)
 print("B",B)
@@ -48,61 +50,69 @@ controls = np.array([init_controls['delta_e'],
 #turn into state space model
 lon_ss = control.ss(A, B, np.eye(A.shape[0]), np.zeros(B.shape))
 
-timevec = np.linspace(0, 50, 1000)
-de = delta_e_cmd * np.ones(timevec.shape)
 
-#map throttle to mass of aircraft
-# thrust_scale = airplane_params['thrust_scale']
-thrust_scale = airplane_params['mass'] * Config.G / \
-    Config.HOVER_THROTTLE * init_controls['delta_t']
-print("thrust_scale:", thrust_scale)
-print("weight of aircraft:", airplane_params['mass'] * Config.G)
-dthrottle = np.ones(timevec.shape) * thrust_scale
-inputs = np.vstack((de, dthrottle))
+#design lqr controller 
+Q = np.diag([1,   
+             0, 
+             0, 
+             1, 
+             0, 
+             0])
 
-Time, [u,w,q,theta,h] = control.forced_response(
-    lon_ss, U=inputs, T=timevec, X0=states)
+R = np.diag([0.1, 
+             0.1])
 
-q = np.rad2deg(q)
-theta = np.rad2deg(theta)
+K, S, E = control.lqr(lon_ss, Q, R)
 
-#plotting
+u_desired = 25
+theta_desired = np.deg2rad(8)
+# Xd = np.matrix([[u_desired,0,0,0,0,0],
+#              [0,1,0,0,0,0]]).T
+
+#set Xd to be the desired state
+Xd = np.matrix([[u_desired,0,0,theta_desired,0,0],
+             [0,0,0,theta_desired,0,0]]).T
+
+
+# Closed loop dynamics
+C = np.eye(A.shape[0])
+D = np.zeros((A.shape[0], B.shape[1]))
+H = control.ss(A-B*K,B*K*Xd,C,D)
+
+# step response
+t = np.linspace(0, 10, 1000)
+t, y = control.step_response(H, t, X0=states)
+#t, x = control.initial_response(H, t, X0=states)
+
+
+# #plotting
 import matplotlib.pyplot as plt
-fig,ax = plt.subplots(2,2, figsize=(10,10))
+plt.close('all')
+#plot system response
+plt.figure()
+fig, ax = plt.subplots(3,2,figsize=(10,10))
+plt.suptitle('LQR Control Response')
+ax[0,0].plot(t,x)
+ax[0,0].set_xlabel('Time [s]')
+ax[0,0].set_ylabel('Velocity [m/s]')
+ax[0,0].grid()
 
-ax[0,0].plot(Time, u)
-ax[0,0].set_xlabel("Time (s)")
-ax[0,0].set_ylabel("u (m/s)")
+ax[0,1].plot(t,y)
+ax[0,1].set_xlabel('Time [s]')
+ax[0,1].set_ylabel('Velocity [m/s]')
+ax[0,1].grid()
 
-ax[0,1].plot(Time, w)
-ax[0,1].set_xlabel("Time (s)")
-ax[0,1].set_ylabel("w (m/s)")
+# ax[1,0].plot(t,x[:,1])
+# ax[1,0].set_xlabel('Time [s]')
+# ax[1,0].set_ylabel('Angle [rad]')
+# ax[1,0].grid()
 
-ax[1,0].plot(Time, q)
-ax[1,0].set_xlabel("Time (s)")
-ax[1,0].set_ylabel("q (deg/s)")
-
-ax[1,1].plot(Time, theta)
-ax[1,1].set_xlabel("Time (s)")
-ax[1,1].set_ylabel("theta (deg)")
-
-#plot title with control inputs
-fig.suptitle("Control Inputs: delta_e = {} deg, delta_t = {} N".format(
-    np.rad2deg(delta_e_cmd), thrust_scale))
-
-#plot height vs time
-fig,ax = plt.subplots(1,1, figsize=(10,10))
-ax.plot(Time, h)
-ax.set_xlabel("Time (s)")
-ax.set_ylabel("h (m)")
-
-# #plot the eigenvalues in one plot 
-eigenvalues = np.linalg.eigvals(A)
-fig,ax = plt.subplots(1,1, figsize=(10,10))
-ax.scatter(eigenvalues.real, eigenvalues.imag, marker='x')
 
 
 plt.show()
+
+
+
 """
 - POLE PLACEMENT
 - TRANSFER FUNCTION

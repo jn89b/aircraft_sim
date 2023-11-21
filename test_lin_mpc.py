@@ -33,7 +33,7 @@ goal_x = 250
 goal_v = 0.0
 goal_p = 0.0
 goal_r = 0.0
-goal_phi = np.deg2rad(45.0)
+goal_phi = np.deg2rad(55.0)
 goal_psi = np.deg2rad(0.0)
 goal_y = 0.0
 
@@ -48,8 +48,8 @@ Q = np.diag([
     0.0, #v
     0.0, #p
     0.0, #r
-    1.0, #phi
-    0.0, #psi
+    0.0, #phi
+    1.0, #psi
     0.0, #y
 ])
 
@@ -91,8 +91,8 @@ lin_mpc_constraints = {
     'p_max': np.deg2rad(60),
     'r_min': np.deg2rad(-60),
     'r_max': np.deg2rad(60),
-    'phi_min': np.deg2rad(-50),
-    'phi_max': np.deg2rad(50)
+    'phi_min': np.deg2rad(-60),
+    'phi_max': np.deg2rad(60)
 }
 
 states = {
@@ -166,7 +166,7 @@ control_results = lin_mpc.unpack_controls(control_results)
 state_results = lin_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 20 #seconds
+t_final = 5 #seconds
 idx_start = 1
 
 control_history = []
@@ -186,10 +186,33 @@ time_current = 0
 for i in range(N):
     
     # if time_current > t_final/2:
-    #     new_vel = 35
-    #     new_theta = goal_theta
-    #     new_height = 5.0
-    #     new_x = goal_x
+    new_vel = 15.0
+    new_w = 0.0
+    new_q = 0.0
+    new_theta = np.deg2rad(-0.03)
+    new_height = 0.0
+    new_x = 250
+    new_v = 0.0
+    new_p = 0.0     
+    new_r = 0.0
+    new_phi = np.deg2rad(45.0) 
+    new_psi = np.deg2rad(10.0) #+ state_results['psi'][idx_start]
+    new_y = 0.0
+    goal_state = np.array([new_vel,
+                                new_w,
+                                new_q,
+                                new_theta,
+                                new_height,
+                                new_x,
+                                new_v,
+                                new_p,
+                                new_r,
+                                new_phi,
+                                new_psi,
+                                new_y])
+        
+    
+    print("new psi", np.rad2deg(new_psi))
     
     lin_mpc.reinitStartGoal(start_state, goal_state)
     
@@ -222,13 +245,13 @@ for i in range(N):
     control_history.append(start_control)
     state_history.append(start_state)
     
-    R = euler_dcm_inertial_to_body(state_results['phi'][idx_start],
+    R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
                                    state_results['theta'][idx_start],
                                    state_results['psi'][idx_start])
     
     body_vel = np.array([state_results['u'][idx_start],
-                            state_results['v'][idx_start],
-                            state_results['w'][idx_start]])
+                        state_results['v'][idx_start],
+                        state_results['w'][idx_start]])
     
     inertial_vel = np.matmul(R, body_vel)
     inertial_pos = inertial_vel * mpc_params['dt_val']
@@ -390,8 +413,8 @@ position_history = np.array(state_position_history)
 z_ned = -np.array(z_ned)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.plot(position_history[:,0], position_history[:,1], -position_history[:,2], label='position')
-ax.plot(x_ned, y_ned, z_ned, label='trajectory')
+ax.plot(position_history[:,0], position_history[:,1], -position_history[:,2], label='trajectory')
+ax.plot(x_ned, y_ned, z_ned, label='rotation')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('z')
