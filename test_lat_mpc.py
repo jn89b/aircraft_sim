@@ -29,8 +29,27 @@ lat_aircraft_ca = LatAirPlaneCasadi(airplane_params, True,
 lat_aircraft_ca.set_state_space()
 
 
-Q = np.diag([0.0, 0.0, 0.0, 0.0, 1.0, 0.0]) 
+Q = np.diag([0.0, 
+             0.0, 
+             0.0, 
+             1.0, 
+             1.0, 
+             0.0]) 
 R = np.diag([0.1, 0.1])
+
+#terminal conditions
+goal_v = 0.0
+goal_p = 0.0
+goal_r = 0.0
+goal_phi = 15.0
+goal_psi = 25.0
+goal_y = 0.0
+goal_state = np.array([goal_v,
+                        goal_p,
+                        goal_r,
+                        np.deg2rad(goal_phi),
+                        np.deg2rad(goal_psi),
+                        goal_y])
 
 mpc_params = {
     'model': lat_aircraft_ca,
@@ -81,19 +100,7 @@ start_state = np.array([states['v'],
 start_control = np.array([controls['delta_a'],
                             controls['delta_r']])
 
-#terminal conditions
-goal_v = 0.0
-goal_p = 0.0
-goal_r = 0.0
-goal_phi = 0.0
-goal_psi = 25.0
-goal_y = 0.0
-goal_state = np.array([goal_v,
-                        goal_p,
-                        goal_r,
-                        np.deg2rad(goal_phi),
-                        np.deg2rad(goal_psi),
-                        goal_y])
+
 
 #begin mpc
 lat_mpc = LateralMPC(mpc_params, lat_mpc_constraints)
@@ -111,7 +118,7 @@ control_results = lat_mpc.unpack_controls(control_results)
 state_results = lat_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 5 #seconds
+t_final = 10 #seconds
 idx_start = 1
 
 control_history = []

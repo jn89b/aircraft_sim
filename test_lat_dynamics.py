@@ -65,8 +65,8 @@ for i in range(N):
     # else:
     # input_aileron = np.deg2rad(10)
     # input_rudder = np.deg2rad(0)
-    input_aileron = 0
-    input_rudder = 15.0
+    input_aileron = np.deg2rad(15)
+    input_rudder = 0.0
     states = lat_airplane.rk45(input_aileron, input_rudder,
                                states, A, B, dt)
     

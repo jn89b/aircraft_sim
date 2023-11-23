@@ -1496,15 +1496,16 @@ class LatAirPlane():
         Ix = self.aircraft_params['Ixx']
         Iz = self.aircraft_params['Izz']
         
-        Y_beta = Q * s * c_y_b / m
+        
+        Y_beta = Q * s * c_y_b / (m*velocity) 
         Y_p = Q * s * b * c_y_p / (2 * m * velocity)
         Y_r = Q * s * b * c_y_r / (2 * m * velocity)
         
-        L_beta = Q * s * b * c_l_b / Ix
+        L_beta = Q * s * b * c_l_b / (Ix*velocity)
         L_p = Q * s * b**2 * c_l_p / (2 * Ix * velocity)
         L_r =  Q * s * b**2 * c_l_r / (2 * Ix  * velocity)
 
-        N_beta = Q * s * b * c_n_b / Iz;
+        N_beta = Q * s * b * c_n_b / (Iz*velocity);
         N_p = Q * s * b**2 * c_n_p / (2 * Iz * velocity)
         N_r = Q * s * b**2 * c_n_r / (2 * Iz * velocity)
         N_dr = Q * s * b * c_n_deltar / Iz;
@@ -1896,15 +1897,15 @@ class LinearizedAircraft():
         Ix = self.aircraft_params['Ixx']
         Iz = self.aircraft_params['Izz']
         
-        Y_beta = Q * s * c_y_b / m
+        Y_beta = Q * s * c_y_b / (m*velocity)
         Y_p = Q * s * b * c_y_p / (2 * m * velocity)
         Y_r = Q * s * b * c_y_r / (2 * m * velocity)
         
-        L_beta = Q * s * b * c_l_b / Ix
+        L_beta = Q * s * b * c_l_b / (Ix*velocity)
         L_p = Q * s * b**2 * c_l_p / (2 * Ix * velocity)
         L_r =  Q * s * b**2 * c_l_r / (2 * Ix  * velocity)
 
-        N_beta = Q * s * b * c_n_b / Iz;
+        N_beta = Q * s * b * c_n_b / (Iz*velocity);
         N_p = Q * s * b**2 * c_n_p / (2 * Iz * velocity)
         N_r = Q * s * b**2 * c_n_r / (2 * Iz * velocity)
         N_dr = Q * s * b * c_n_deltar / Iz;

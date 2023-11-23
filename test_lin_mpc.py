@@ -33,8 +33,8 @@ goal_x = 250
 goal_v = 0.0
 goal_p = 0.0
 goal_r = 0.0
-goal_phi = np.deg2rad(55.0)
-goal_psi = np.deg2rad(0.0)
+goal_phi = np.deg2rad(45.0)
+goal_psi = np.deg2rad(30.0)
 goal_y = 0.0
 
 #weighting matrices for state
@@ -48,7 +48,7 @@ Q = np.diag([
     0.0, #v
     0.0, #p
     0.0, #r
-    0.0, #phi
+    1.0, #phi
     1.0, #psi
     0.0, #y
 ])
@@ -166,7 +166,7 @@ control_results = lin_mpc.unpack_controls(control_results)
 state_results = lin_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 5 #seconds
+t_final = 15 #seconds
 idx_start = 1
 
 control_history = []
@@ -196,7 +196,7 @@ for i in range(N):
     new_p = 0.0     
     new_r = 0.0
     new_phi = np.deg2rad(45.0) 
-    new_psi = np.deg2rad(10.0) #+ state_results['psi'][idx_start]
+    new_psi = np.deg2rad(5.0) #+ state_results['psi'][idx_start]
     new_y = 0.0
     goal_state = np.array([new_vel,
                                 new_w,
@@ -266,6 +266,11 @@ for i in range(N):
                                             state_results['h'][idx_start]]))
     
 
+    #replace the position with the inertial position
+    start_state[5] = x_original
+    start_state[11] = y_original
+    start_state[4] = z_original
+    
     # inertial_position = np.array([state_results['x'][idx_start],
     #                                 state_results['y'][idx_start],
     #                                 state_results['h'][idx_start]])
@@ -422,5 +427,14 @@ ax.scatter(x_ned[0], y_ned[0], z_ned[0], marker='o', label='start')
 ax.scatter(x_ned[-1], y_ned[-1], z_ned[-1], marker='x', label='end')
 ax.legend()
 ax.set_title('3D Trajectory in NEU Frame')
+
+
+airspeed = np.sqrt(np.array(u)**2 + +np.array(v)**2 + np.array(w)**2)
+
+#plot airspeed
+fig,ax = plt.subplots(1,1)
+ax.plot(time_vec, airspeed)
+ax.set_ylabel('airspeed (m/s)')
+ax.set_xlabel('time (s)')
 
 plt.show()
