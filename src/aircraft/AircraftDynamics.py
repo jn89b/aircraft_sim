@@ -13,11 +13,496 @@ from src.math_lib.VectorOperations import ca_euler_dcm_body_to_inertial, \
     ca_euler_dcm_inertial_to_body
  
 
+def convert_lin_states_to_regular(states:np.ndarray) -> np.ndarray:
+    """
+     Given states modeled as linearized states :
+        [u, 
+         w, 
+         q, 
+         theta, 
+         h, 
+         x, 
+         v, 
+         p, 
+         r, 
+         phi, 
+         psi, 
+         y]
+        
+    Returns the states in the regular order:
+        [x, 
+         y, 
+         z, 
+         u, 
+         v, 
+         w, 
+         phi, 
+         theta, 
+         psi, 
+         p, 
+         q, 
+         r]
+        
+    To do:
+        - Have this use an index configuration to avoid confusion
+    """
+    return np.array([states[5], 
+                     states[11], 
+                     states[4], 
+                     states[0], 
+                     states[6], 
+                     states[1], 
+                     states[9], 
+                     states[3], 
+                     states[10], 
+                     states[7], 
+                     states[2], 
+                     states[8]])
+    
+def convert_lin_controls_to_regular(controls:np.ndarray) -> np.ndarray:
+    """
+    Given controls modeled as linearized controls:
+        [delta_e, delta_t, delta_a, delta_r]
+        
+    Returns the controls in the regular order:
+        [delta_a, delta_e, delta_r, delta_t]
+        
+    To do:
+        - Have this use an index configuration to avoid confusion
+    """ 
+    return np.array([controls[2],
+                    controls[0],
+                    controls[3],
+                    controls[1]])
+    
+    
+def convert_regular_states_to_lin(states:np.ndarray) -> np.ndarray:
+    """
+    Given states in the regular order:
+        [x, y, z, u, v, w, phi, theta, psi, p, q, r]
+        
+    Returns the states modeled as linearized states :
+        [u, w, q, theta, h, x, v, p, r, phi, psi, y]
+        
+    To do:
+        - Have this use an index configuration to avoid confusion
+    """
+    return np.array([states[3], 
+                     states[1], 
+                     states[10], 
+                     states[7], 
+                     states[2], 
+                     states[0], 
+                     states[6], 
+                     states[11], 
+                     states[9], 
+                     states[5], 
+                     states[4], 
+                     states[8]])
+    
+def convert_regular_controls_to_lin(controls:np.ndarray) -> np.ndarray:
+    """
+    Given controls in the regular order:
+        [delta_a, delta_e, delta_r, delta_t]
+        
+    Returns the controls modeled as linearized controls orientation:
+        [delta_e, delta_t, delta_a, delta_r]
+        
+    To do:
+        - Have this use an index configuration to avoid confusion
+    """ 
+    return np.array([controls[1],
+                    controls[3],
+                    controls[0],
+                    controls[2]])
+    
+class AircraftDynamicsV2():
+    def __init__(self, aircraft:AircraftInfo) -> None:
+        self.aircraft = aircraft
+        self.thrust_scale = self.aircraft.aircraft_params['mass'] * 9.81 / \
+            Config.HOVER_THROTTLE
+            
+    
+    def compute_alpha(self, u:float, w:float) -> float:
+        """
+        Computes the angle of attack
+        """
+        #compute the angle of attack
+        return np.arctan2(w, u)        
+    
+    def compute_beta(self, v:float, airspeed:float) -> float:
+        """
+        Computes the sideslip angle
+        """
+        #check divide by zero 
+        # if u == 0:
+        #     return 0.
+        beta_rad = np.arcsin(v/airspeed)
+        return beta_rad
+
+    def lift_coeff(self, alpha:float) -> float:
+        """
+        Computes the lift coefficient with a linear and flat plate model
+        """
+        coefficient = self.aircraft.aircraft_params
+        alpha0 = coefficient["alpha_stall"]
+        M = coefficient["mcoeff"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+
+        max_alpha_delta = 0.8
+        if alpha - alpha0 > max_alpha_delta:
+            alpha = alpha0 + max_alpha_delta
+        elif alpha0 - alpha > max_alpha_delta:
+            alpha = alpha0 - max_alpha_delta
+
+        sigmoid = (1 + np.exp(-M * (alpha - alpha0)) + \
+                   np.exp(M * (alpha + alpha0))) / (1 + math.exp(-M * (alpha - alpha0))) \
+                    / (1 + math.exp(M * (alpha + alpha0)))
+        linear = (1.0 - sigmoid) * (c_lift_0 + c_lift_a0 * alpha)  # Lift at small AoA
+        flat_plate = sigmoid * (2 * math.copysign(1, alpha) * math.pow(math.sin(alpha), 2) * math.cos(alpha))  # Lift beyond stall
+
+        return linear + flat_plate
+    
+    def drag_coeff(self, alpha_rad) -> float:
+        coefficient = self.aircraft.aircraft_params
+        b = coefficient["b"]
+        s = coefficient["s"]
+        c_drag_p = coefficient["c_drag_p"]
+        c_lift_0 = coefficient["c_lift_0"]
+        c_lift_a0 = coefficient["c_lift_a"]
+        oswald = coefficient["oswald"]
+        
+        ar = pow(b, 2) / s
+        c_drag_a = c_drag_p + pow(c_lift_0 + c_lift_a0 * alpha_rad, 2) / \
+            (np.pi * oswald * ar)
+
+        return c_drag_a
+    
+    
+    def compute_cy(self, beta_rad:float,
+                   states:np.ndarray, 
+                   aileron_input_rad:float,
+                   rudder_input_rad:float) -> float:
+        """
+        x y z u v w phi theta psi p q r
+        """
+        coefficients = self.aircraft.aircraft_params
+        c_y_b = coefficients["c_y_b"]
+        c_y_p = coefficients["c_y_p"]
+        c_y_r = coefficients["c_y_r"]
+        c_y_deltaa = coefficients["c_y_deltaa"]
+        c_y_deltar = coefficients["c_y_deltar"]
+        
+        # CYbeta  =	interp1(AlphaTable,CYBetaTable,alphadeg);
+        # CYp     =   interp1(AlphaTable,CYpHatTable,alphadeg)*b/(2*V);
+        # CYr     =   interp1(AlphaTable,CYrHatTable,alphadeg)*b/(2*V);
+        # CYdA    =   interp1(AlphaTable,CYdATable,alphadeg);	
+        # CYdR    =   interp1(AlphaTable,CYdRTable,alphadeg);	
+        # CYdAS   =   interp1(AlphaTable,CYdASTable,alphadeg);
+
+        # CY      =   CYbeta*betar + CYp*x(7) + CYr*x(9) ...
+        #             + CYdA*u(2) + CYdR*u(3) + CYdAS*u(5);
+        
+        
+        CY = (c_y_b * beta_rad) + (c_y_p * states[9]) + \
+            (c_y_r * states[11]) + (c_y_deltaa * aileron_input_rad) + \
+                (c_y_deltar * rudder_input_rad)
+            
+        return CY
+
+
+    def compute_Cm(self, alpha_rad:float, 
+                   input_elevator_rad:float) -> float:
+        """
+        Computes the pitching moment coefficient
+        """
+        coefficient = self.aircraft.aircraft_params
+        c_m_a = coefficient["c_m_a"]
+        c_m_q = coefficient["c_m_q"]
+        c_m_deltae = coefficient["c_m_deltae"]
+
+        # CmStat  =	interp1(AlphaTable,CmTable,alphadeg);
+        # Cmq     =   interp1(AlphaTable,CmqHatTable,alphadeg)*cBar/(2*V);
+        # CmdE	=	interp1(AlphaTable,CmdETable,alphadeg);
+        # CmdF	=	interp1(AlphaTable,CmdFTable,alphadeg);
+        # CmdS	=	interp1(AlphaTable,CmdSTable,alphadeg);
+
+        # Cm  =	CmStat - CL*SMsim + Cmq*x(8) + CmdE*u(1)+ CmdF*u(6) + CmdS*u(7);
+
+        #Cm = c_m_0 + c_m_a * alpha_rad + c_m_q * alpha_rad + c_m_deltae
+        Cm = (c_m_a * alpha_rad) + (c_m_q * alpha_rad) + (c_m_deltae*input_elevator_rad)
+        return Cm
+    
+    def compute_roll_momemt_coefficient(self, beta_rad:float,
+                                        states:np.ndarray,
+                                        input_aileron_rad:float,
+                                        input_rudder_rad:float) -> float:
+	
+        # Clbeta	=	interp1(AlphaTable,ClBetaTable,alphadeg);
+        # Clp	    =	interp1(AlphaTable,ClpHatTable,alphadeg)*b/(2*V);				
+        # Clr	    =	interp1(AlphaTable,ClrHatTable,alphadeg)*b/(2*V);				
+        # CldA    =	interp1(AlphaTable,CldATable,alphadeg);
+        # CldR	=	interp1(AlphaTable,CldRTable,alphadeg);
+        # CldAS   =   interp1(AlphaTable,CYdASTable,alphadeg);
+        
+        
+        # Cl      =	Clbeta*betar + Clr*x(9) + Clp*x(7) ...
+        #             + (CldA*u(2) + CldR*u(3) + CldAS*u(5));
+        # x9 is r 
+        # x7 is p
+        # u2 is aileron
+        # u3 is rudder
+        aircraft_params = self.aircraft.aircraft_params
+        c_l_b = aircraft_params["c_l_b"]
+        c_l_p = aircraft_params["c_l_p"]
+        c_l_r = aircraft_params["c_l_r"]
+        c_l_deltaa = aircraft_params["c_l_deltaa"]
+        c_l_deltar = aircraft_params["c_l_deltar"]
+        
+        r = states[11]
+        p = states[9]
+        
+        
+        roll_moment = (c_l_b * beta_rad) + (c_l_p * p) + \
+            (c_l_r * r) + (c_l_deltaa * input_aileron_rad) + \
+                (c_l_deltar * input_rudder_rad)
+        
+        return roll_moment
+    
+    def compute_Cn(self, beta_rad:float,
+                   states:np.ndarray, input_aileron_rad:float,
+                   input_rudder_rad:float) -> float:
+
+        """
+        x y z u v w phi theta psi p q r
+        """
+        # Cnbeta	=	interp1(AlphaTable,CnBetaTable,alphadeg);
+        # Cnp	    =	interp1(AlphaTable,CnpHatTable,alphadeg)*b/(2*V);				
+        # Cnr	    =	interp1(AlphaTable,CnrHatTable,alphadeg)*b/(2*V);				
+        # CndA    =	interp1(AlphaTable,CndATable,alphadeg);
+        # CndR	=	interp1(AlphaTable,CndRTable,alphadeg);
+        # CndAS   =   interp1(AlphaTable,CndASTable,alphadeg);
+
+        # Cn      =	Cnbeta*betar + Cnp*x(7) + Cnr*x(9) ...
+        #             + (CndA*u(2) + CndR*u(3) + CndAS*u(5));
+        
+        coefficient = self.aircraft.aircraft_params
+        c_n_0 = coefficient["c_n_0"]
+        c_n_b = coefficient["c_n_b"]
+        c_n_p = coefficient["c_n_p"]
+        c_n_r = coefficient["c_n_r"]
+        c_n_deltaa = coefficient["c_n_deltaa"]
+        c_n_deltar = coefficient["c_n_deltar"]
+        
+        Cn = (c_n_b * beta_rad) + (c_n_p * states[9]) + \
+            (c_n_r * states[7]) + (c_n_deltaa * input_aileron_rad) + \
+                (c_n_deltar * input_rudder_rad)
+        
+        return Cn
+
+    
+    def compute_derivatives(self, input_aileron_rad:float,
+                            input_elevator_rad:float,
+                            input_rudder_rad:float,
+                            input_thrust_percent:float, 
+                            current_states:np.ndarray) -> np.ndarray:
+        """
+        Computes the derivatives of the aircraft 
+        """
+        # unpacking states
+        b = self.aircraft.aircraft_params['b']
+        c_l_deltae = self.aircraft.aircraft_params['c_lift_deltae']
+        c = self.aircraft.aircraft_params['c']
+        current_states = self.aircraft.states
+        u = current_states[3]
+        v = current_states[4]
+        w = current_states[5]
+        phi = current_states[6]
+        theta = current_states[7]
+        psi = current_states[8]
+        p = current_states[9]
+        q = current_states[10]
+        r = current_states[11]
+        
+        #check theta     
+        airspeed = np.sqrt(u**2 + v**2 + w**2)
+        
+        alpha_rad = self.compute_alpha(u, 
+                                       v)
+        
+        beta_rad = self.compute_beta(v,
+                                     airspeed)
+
+        CL = self.lift_coeff(alpha_rad) + (c_l_deltae*input_elevator_rad)             
+        CD = self.drag_coeff(alpha_rad)
+        
+        CX = -CD*np.cos(alpha_rad) + CL*np.sin(alpha_rad)
+        CY = self.compute_cy(beta_rad,
+                             current_states, 
+                             input_aileron_rad,
+                             input_rudder_rad)
+        CZ = -CD*np.sin(alpha_rad) - CL*np.cos(alpha_rad)
+        
+        CM = self.compute_Cm(alpha_rad, input_elevator_rad)
+        CN = self.compute_Cn(beta_rad,
+                             current_states,
+                             input_aileron_rad,
+                             input_rudder_rad)
+        roll_moment = self.compute_roll_momemt_coefficient(beta_rad,
+            current_states, input_aileron_rad, input_rudder_rad)
+                                                              
+        
+        Q = 0.5 * self.aircraft.rho * airspeed**2
+        S = self.aircraft.aircraft_params['s']
+        m = self.aircraft.aircraft_params['mass']
+        # map thrust to newtons
+        input_thrust_n = input_thrust_percent * self.thrust_scale
+        
+        #Earth to Body DCM
+        phi = current_states[6]
+        theta = current_states[7]
+        psi = current_states[8]
+        
+        HEB = euler_dcm_inertial_to_body(phi, theta, psi)
+        gravity_earth = np.array([0, 0, Config.G])
+        gravity_body = np.matmul(HEB, gravity_earth)
+         
+        # state accelerations
+        Xb = ((Q*S*CX) + input_thrust_n) / m
+        Yb = (Q*S*CY) / m
+        Zb = (Q*S*CZ) / m
+        
+        # state moments
+        Lb = roll_moment*Q*S*b
+        Mb = (Q*S*b*CM*c) / m
+        Nb = (Q*S*b*CN) / m
+        
+        #include CG offset
+        CGOffset_x = self.aircraft.aircraft_params["CGOffset_x"]
+        CGOffset_y = self.aircraft.aircraft_params["CGOffset_y"]
+        CGOffset_z = self.aircraft.aircraft_params["CGOffset_z"]
+        
+        Lb +=  CGOffset_y*Zb - CGOffset_z*Yb
+        Mb += -CGOffset_x*Zb + CGOffset_z*Xb
+        Nb += -CGOffset_y*Xb + CGOffset_x*Yb        
+        
+        nz = -Zb/Config.G #normal load factor
+        
+        # dynamic equations
+        # accelerations in the body frame
+        u_dot = Xb + gravity_body[0] + (r*v) - (q*w) 
+        v_dot = Yb + gravity_body[1] - (r*u) + (p*w)
+        w_dot = Zb + gravity_body[2] + (q*u) - (p*v)
+        
+        #
+        rotation = np.matmul(HEB, np.array([u, v, w]))
+        x_dot = rotation[0]
+        y_dot = rotation[1]
+        z_dot = rotation[2]
+        
+        #moments
+        Ixx = self.aircraft.aircraft_params["Ixx"]
+        Iyy = self.aircraft.aircraft_params["Iyy"]
+        Izz = self.aircraft.aircraft_params["Izz"]
+        Ixz = 0.0
+  
+        p_dot = (Lb +  (Ixx - Iyy) * q * r)  / Ixx
+        q_dot = (Mb - (Izz - Iyy) * p * q) / Iyy
+        r_dot = (Nb + (Ixx - Izz) * p * q) / Izz
+        # p_dot	= Izz*Lb -(Izz*(Izz - Iyy)*r)*q / (Ixx*Izz)
+        # q_dot   = Mb - (Ixx - Izz)*p*r / Iyy
+        # r_dot   = Ixx*Nb - (Ixx*(Ixx - Iyy)*p)*q / (Ixx*Izz)
+        
+        B = compute_B_matrix(phi, theta, psi)
+        phi_theta_psi_dot = np.matmul(B, np.array([p, q, r]))
+        
+        phi_dot = phi_theta_psi_dot[0]
+        theta_dot = phi_theta_psi_dot[1]
+        psi_dot = phi_theta_psi_dot[2]
+                
+        derivatives = np.array([x_dot, y_dot, z_dot,
+                                u_dot, v_dot, w_dot,
+                                phi_dot, theta_dot, psi_dot,
+                                p_dot, q_dot, r_dot])
+        
+        return derivatives
+
+    
+    def rk45(self, 
+             input_aileron_rad:float,
+             input_elevator_rad:float,
+             input_rudder_rad:float,
+             input_thrust_n:float,
+             states:np.ndarray,
+             delta_time:float) -> np.ndarray:
+        """
+        Simulates the aircraft using the Runge-Kutta 4th order method 
+        """
+        #get the current states
+        current_states = states
+
+        #compute the derivatives
+        k1 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                        input_elevator_rad,
+                                        input_rudder_rad,
+                                        input_thrust_n,
+                                        current_states)
+        
+        k2 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                        input_elevator_rad,
+                                        input_rudder_rad,
+                                        input_thrust_n,
+                                        current_states + k1/2)
+        
+        k3 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                        input_elevator_rad,
+                                        input_rudder_rad,
+                                        input_thrust_n,
+                                        current_states + k2/2)
+        
+        k4 = delta_time * self.compute_derivatives(input_aileron_rad,
+                                        input_elevator_rad,
+                                        input_rudder_rad,
+                                        input_thrust_n,
+                                        current_states + k3)
+        
+        new_states = current_states + (k1 + 2*k2 + 2*k3 + k4) / 6
+     
+
+        return new_states
+        
+    def eulers(self, 
+               input_aileron_rad:float,
+               input_elevator_rad:float,
+               input_rudder_rad:float,
+               input_thrust_n:float,
+               states:np.ndarray,
+               delta_time:float) -> np.ndarray:
+        """
+        Simulates the aircraft using the Euler's method 
+        """
+        #get the current states
+        current_states = states
+
+        #compute the derivatives
+        derivatives = self.compute_derivatives(input_aileron_rad,
+                                        input_elevator_rad,
+                                        input_rudder_rad,
+                                        input_thrust_n,
+                                        current_states)
+        
+        new_states = current_states + derivatives * delta_time
+     
+
+        return new_states
+    
 class AircraftDynamics():
     def __init__(self, aircraft:AircraftInfo) -> None:
         self.aircraft = aircraft
         self.thrust_scale = self.aircraft.aircraft_params['mass'] * 9.81 / \
             Config.HOVER_THROTTLE
+            
 
     def compute_aoa(self, u:float, w:float) -> float:
         """
@@ -38,7 +523,7 @@ class AircraftDynamics():
         # if u == 0:
         #     return 0.
         airspeed = np.sqrt(u**2 + v**2 + w**2)
-        beta_rad = np.arcsin(v/airspeed)
+        beta_rad = np.arcsin(v/u)
         return beta_rad
     
     def compute_moments(self,
@@ -129,7 +614,7 @@ class AircraftDynamics():
                         c_n_deltaa * input_aileron +
                         c_n_deltar * input_rudder)
             
-        la += CGOffset[1] * force[2] - CGOffset[2] * force[1]
+        la +=  CGOffset[1] * force[2] - CGOffset[2] * force[1]
         ma += -CGOffset[0] * force[2] + CGOffset[2] * force[0]
         na += -CGOffset[1] * force[0] + CGOffset[0] * force[1]
 
@@ -247,7 +732,6 @@ class AircraftDynamics():
         # scale the thrust to newtons
         input_thrust = input_thrust * self.thrust_scale
         
-        
         f_total_body = np.array([f_ax_b+input_thrust, 
                                  f_ay_b, 
                                  f_az_b])
@@ -289,26 +773,20 @@ class AircraftDynamics():
         """
         Computes the derivatives of the aircraft 
         """
-
-
-
         forces = self.compute_forces(input_aileron_rad,
-                                        input_elevator_rad,
-                                        input_rudder_rad,
-                                        input_thrust_n, 
-                                        states)
+                                     input_elevator_rad,
+                                     input_rudder_rad,
+                                     input_thrust_n, 
+                                     states)
 
         moments = self.compute_moments(input_aileron_rad,
-                                        input_elevator_rad,
-                                        input_rudder_rad,
-                                        forces,
-                                        states)
-        
-        
-        
+                                    input_elevator_rad,
+                                    input_rudder_rad,
+                                    forces,
+                                    states)
+    
         # compute angular accelerations 
-        p_q_r_dot = self.compute_ang_acc(moments, states)
-        
+        p_q_r_dot = self.compute_ang_acc(moments, states)    
         p_q_r_dot = np.clip(-Config.MAX_RADIAN, 
                             Config.MAX_RADIAN, 
                             p_q_r_dot)
@@ -342,13 +820,13 @@ class AircraftDynamics():
         mass = self.aircraft.aircraft_params['mass']
         
         #accelerations
-        u_dot = forces[0]/mass - gravity_body_frame[0] - (q*w)  + (r*v)
+        u_dot = forces[0]/mass + gravity_body_frame[0] - (q*w)  + (r*v)
         v_dot = forces[1]/mass + gravity_body_frame[1] - (r*u)  + (p*w)
         w_dot = forces[2]/mass + gravity_body_frame[2] - (p*v)  + (q*u)
 
-        u_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, u_dot)
-        v_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, v_dot)
-        w_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, w_dot)
+        # u_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, u_dot)
+        # v_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, v_dot)
+        # w_dot = np.clip(-Config.ACCEL_LIM, Config.ACCEL_LIM, w_dot)
         
         #velocities
         dcm_body_to_inertial = euler_dcm_body_to_inertial(phi, theta, psi)

@@ -85,13 +85,20 @@ class AircraftInfo():
                            'u', 'v', 'w', 
                            'phi', 'theta', 
                            'psi', 
-                           'p', 'q', 'r']:
+                           'p', 'q', 'r', 'h']:
                 raise ValueError("The key {} is not valid".format(key))
         
         #position frame are in inertial ned
         self.x = init_states['x']
         self.y = init_states['y']
-        self.z = init_states['z']
+        
+        #the dictionary might be using h instead of z
+        if 'z' not in init_states.keys():
+            self.z = init_states['h']
+            self.use_z_key = False
+        else:
+            self.z = init_states['z']   
+            self.use_z_key = True
 
         #velocity frame are in body
         self.u = init_states['u']

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.animation import FuncAnimation
-from src.aircraft.AircraftDynamics import AircraftDynamics
+from src.aircraft.AircraftDynamics import AircraftDynamics, AircraftDynamicsV2
 from src.aircraft.Aircraft import AircraftInfo
 from src.Utils import get_airplane_params
 
@@ -22,7 +22,7 @@ if __name__=="__main__":
     df = pd.read_csv("SIM_Plane_h_vals.csv")
     airplane_params = get_airplane_params(df)
 
-    use_csv_for_init = True
+    use_csv_for_init = False
     
     if use_csv_for_init == False:
             
@@ -32,7 +32,7 @@ if __name__=="__main__":
                     'p':0.0, 'q':0.0, 'r':0.0}
         
         #a negatitive elevator command makes it go up 
-        controls = {'delta_e':np.deg2rad(0.0), 
+        controls = {'delta_e':np.deg2rad(10.0), 
                     'delta_a':np.deg2rad(0.0), 
                     'delta_r':np.deg2rad(0.0), 
                     'delta_t':0.4}
@@ -69,14 +69,14 @@ if __name__=="__main__":
         init_states,
         controls)
     
-    aircraft_dynamics_eulers = AircraftDynamics(aircraft_info_euler)
-    aircraft_dynamics_rk = AircraftDynamics(aircraft_info_rk)
+    aircraft_dynamics_eulers = AircraftDynamicsV2(aircraft_info_euler)
+    aircraft_dynamics_rk = AircraftDynamicsV2(aircraft_info_rk)
 
     dt = 0.01        
     t_init = 0.0
     t_final = 5.0
     N = int((t_final - t_init) / dt)
-    print(N)
+    N = 10
     # N = 100
 
     input_aileron = controls['delta_a']
@@ -87,7 +87,7 @@ if __name__=="__main__":
     euler_states = []
     rk_states = []
 
-    use_linear_csv = True
+    use_linear_csv = False
     if use_linear_csv == True:
         controls_df = pd.read_csv("MPC_Plane_controls.csv")
         states_df = pd.read_csv("MPC_Plane_states.csv")

@@ -31,6 +31,8 @@ def euler_dcm_inertial_to_body(phi_rad:float,
     """
     This computes the DCM matrix going from inertial to body frame
     """
+    
+    
     # Compute the direction cosine matrix elements
     cos_phi = np.cos(phi_rad)
     sin_phi = np.sin(phi_rad)
@@ -38,6 +40,9 @@ def euler_dcm_inertial_to_body(phi_rad:float,
     sin_theta = np.sin(theta_rad)
     cos_psi = np.cos(psi_rad)
     sin_psi = np.sin(psi_rad)
+    
+    if cos_theta <= 0.00001:
+        cos_theta = 0.00001*np.sign(cos_theta)
     
     # Compute the DCM elements    
     dcm = np.array([[cos_theta * cos_psi, cos_theta * sin_psi, -sin_theta],

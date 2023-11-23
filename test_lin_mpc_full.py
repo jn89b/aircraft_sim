@@ -1,3 +1,9 @@
+"""
+Testing the linearized MPC and feeding it back to 6DOF simulation
+- Use 6dof states to close the loop and send it back to MPC 
+
+"""
+
 import numpy as np
 import pandas as pd
 import casadi as ca
@@ -5,10 +11,20 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 
 from src.Utils import read_lon_matrices, get_airplane_params
-from src.aircraft.AircraftDynamics import LinearizedAircraft, LinearizedAircraftCasadi
+
+from src.aircraft.AircraftDynamics import LinearizedAircraft, \
+    LinearizedAircraftCasadi, AircraftDynamics     
+from src.aircraft.Aircraft import AircraftInfo
 from src.mpc.FixedWingMPC import LinearizedAircraftMPC
+
 from src.math_lib.VectorOperations import euler_dcm_body_to_inertial, euler_dcm_inertial_to_body, \
     compute_B_matrix
+    
+from src.aircraft.AircraftDynamics import convert_lin_controls_to_regular,\
+    convert_lin_states_to_regular, convert_lin_states_to_regular, \
+    convert_lin_controls_to_regular, convert_regular_states_to_lin, \
+    convert_regular_controls_to_lin
+
     
 df = pd.read_csv("SIM_Plane_h_vals.csv")
 airplane_params = get_airplane_params(df)
@@ -48,22 +64,22 @@ Q = np.diag([
     0.0, #v
     0.0, #p
     0.0, #r
-    1.0, #phi
+    0.0, #phi
     0.0, #psi
     0.0, #y
 ])
 
 R = np.diag([
-    0.0, #delta_e
-    0.0, #delta_t
-    0.0, #delta_a
-    0.0, #delta_r
+    1.0, #delta_e
+    1.0, #delta_t
+    1.0, #delta_a
+    1.0, #delta_r
 ])
 
 mpc_params = {
     'model': lin_aircraft_ca,
-    'dt_val': 0.1,
-    'N': 15,
+    'dt_val': 0.01,
+    'N': 10,
     'Q': Q,
     'R': R,
 }
@@ -166,7 +182,7 @@ control_results = lin_mpc.unpack_controls(control_results)
 state_results = lin_mpc.unpack_states(state_results)
 
 ## simulate the trajectory of the aircraft
-t_final = 20 #seconds
+t_final = 3 #seconds
 idx_start = 1
 
 control_history = []
@@ -175,6 +191,9 @@ position_history = []
 state_position_history = []
 goal_history = []
 
+# initialize the simulator
+aircraft_info = AircraftInfo(airplane_params, states, controls)
+aircraft_dynamics = AircraftDynamics(aircraft_info)
 
 x_original = 0
 y_original = 0
@@ -186,7 +205,7 @@ time_current = 0
 for i in range(N):
     
     # if time_current > t_final/2:
-    new_vel = 15.0
+    new_vel = 20.0
     new_w = 0.0
     new_q = 0.0
     new_theta = np.deg2rad(-0.03)
@@ -211,18 +230,16 @@ for i in range(N):
                                 new_psi,
                                 new_y])
         
-    
-    print("new psi", np.rad2deg(new_psi))
-    
+        
     lin_mpc.reinitStartGoal(start_state, goal_state)
     
     control_results, state_results = lin_mpc.solveMPCRealTimeStatic(
-        start_state, goal_state, start_control)
-    
+        start_state, goal_state, start_control)    
     #unpack the results
     control_results = lin_mpc.unpack_controls(control_results)
     state_results = lin_mpc.unpack_states(state_results)
     
+    ## this is where I need to do a step input for the 6DOF simulation
     start_state = np.array([state_results['u'][idx_start],
                               state_results['w'][idx_start],
                               state_results['q'][idx_start],
@@ -237,39 +254,55 @@ for i in range(N):
                               state_results['y'][idx_start]])
     
     start_control = np.array([control_results['delta_e'][idx_start],
-                                control_results['delta_t'][idx_start],
-                                control_results['delta_a'][idx_start],
-                                control_results['delta_r'][idx_start]])
+                            control_results['delta_t'][idx_start],
+                            control_results['delta_a'][idx_start],
+                            control_results['delta_r'][idx_start]])
         
+    input_aileron  = control_results['delta_a'][idx_start]
+    input_rudder   = control_results['delta_r'][idx_start]
+    input_elevator = control_results['delta_e'][idx_start]
+    input_throttle = control_results['delta_t'][idx_start]
+    
+    sim_states = convert_lin_states_to_regular(start_state)
+    
+    actual_states = aircraft_dynamics.rk45(input_aileron, 
+                                            input_elevator,
+                                            input_rudder, 
+                                            input_throttle,
+                                            sim_states,                                    
+                                            mpc_params['dt_val'])
+
+    start_state = convert_regular_states_to_lin(actual_states)
+
     #store the result in history
     control_history.append(start_control)
     state_history.append(start_state)
     
-    R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
-                                   state_results['theta'][idx_start],
-                                   state_results['psi'][idx_start])
+    # R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
+    #                                state_results['theta'][idx_start],
+    #                                state_results['psi'][idx_start])
     
-    body_vel = np.array([state_results['u'][idx_start],
-                        state_results['v'][idx_start],
-                        state_results['w'][idx_start]])
+    # body_vel = np.array([state_results['u'][idx_start],
+    #                     state_results['v'][idx_start],
+    #                     state_results['w'][idx_start]])
     
-    inertial_vel = np.matmul(R, body_vel)
-    inertial_pos = inertial_vel * mpc_params['dt_val']
+    # inertial_vel = np.matmul(R, body_vel)
+    # inertial_pos = inertial_vel * mpc_params['dt_val']
     
-    x_original = x_original + inertial_pos[0]
-    y_original = y_original + inertial_pos[1]
-    z_original = z_original + inertial_pos[2]
-    position_history.append(np.array([x_original, y_original, z_original]))    
+    # x_original = x_original + inertial_pos[0]
+    # y_original = y_original + inertial_pos[1]
+    # z_original = z_original + inertial_pos[2]
+    # position_history.append(np.array([x_original, y_original, z_original]))    
 
-    state_position_history.append(np.array([state_results['x'][idx_start],
-                                            state_results['y'][idx_start],
-                                            state_results['h'][idx_start]]))
+    # state_position_history.append(np.array([state_results['x'][idx_start],
+    #                                         state_results['y'][idx_start],
+    #                                         state_results['h'][idx_start]]))
     
-
-    #replace the position with the inertial position
-    start_state[5] = x_original
-    start_state[11] = y_original
-    start_state[4] = z_original
+    
+    # #replace the position with the inertial position
+    # start_state[5] = x_original
+    # start_state[11] = y_original
+    # start_state[4] = z_original
     
     # inertial_position = np.array([state_results['x'][idx_start],
     #                                 state_results['y'][idx_start],
@@ -280,10 +313,6 @@ for i in range(N):
     
     time_current += mpc_params['dt_val']
 
-
-x_ned = [x[0] for x in position_history]
-y_ned = [x[1] for x in position_history]
-z_ned = [x[2] for x in position_history]
 
 u = [x[0] for x in state_history]
 w = [x[1] for x in state_history]
@@ -345,6 +374,7 @@ y_goal = [x[11] for x in goal_history]
 alpha = np.arctan(-np.array(w)/np.array(u))
 
 #%%
+plt.close('all')
 time_vec = np.linspace(0, t_final, N)
 fig,ax = plt.subplots(6,2)
 ax[0,0].plot(time_vec, u, label='u')
@@ -415,17 +445,17 @@ ax[3].set_ylabel("delta_r (deg)")
 
 #plot 3d trajectory
 position_history = np.array(state_position_history)
-z_ned = -np.array(z_ned)
+z_ned = -np.array(h)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.plot(position_history[:,0], position_history[:,1], -position_history[:,2], 
-        label='trajectory (linearized)')
-ax.plot(x_ned, y_ned, z_ned, label='rotation (actual position)')
+# ax.plot(position_history[:,0], position_history[:,1], -position_history[:,2], 
+#         label='trajectory (linearized)')
+ax.plot(x, y, z_ned, label='rotation (actual position)')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('z')
-ax.scatter(x_ned[0], y_ned[0], z_ned[0], marker='o', label='start')
-ax.scatter(x_ned[-1], y_ned[-1], z_ned[-1], marker='x', label='end')
+ax.scatter(x[0], y[0], z_ned[0], marker='o', label='start')
+ax.scatter(x[-1], y[-1], z_ned[-1], marker='x', label='end')
 ax.legend()
 ax.set_title('3D Trajectory in NEU Frame')
 

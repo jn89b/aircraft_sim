@@ -75,7 +75,7 @@ class LinearizedAircraftMPC(ModelPredictiveControl):
     
     def unpack_states(self, x:ca.DM) -> dict:
         """
-        unpack the state variables
+        unpack the state variables as a dictionary of numpy arrays
         """
         #reshape to -1
         # x = np.array(x).reshape(-1, 12)
