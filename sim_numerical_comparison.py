@@ -15,7 +15,7 @@ Euler's method and Runge-Kutta 4th order method.
 
 """
 
-
+plt.close('all')
 if __name__=="__main__":
     #check if csv file exists
 
@@ -76,7 +76,7 @@ if __name__=="__main__":
     t_init = 0.0
     t_final = 5.0
     N = int((t_final - t_init) / dt)
-    N = 10
+    N = 20
     # N = 100
 
     input_aileron = controls['delta_a']

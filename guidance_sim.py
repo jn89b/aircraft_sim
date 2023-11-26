@@ -22,7 +22,6 @@ Make this small scale first
 
 Create a simple c space with one radar
 Have some obstacles placed within range
-
 """
 
 import plotly.graph_objects as go
@@ -62,13 +61,13 @@ if __name__ == '__main__':
 
     #load simple sim
     start_position = PositionVector(10,60,5)
-    goal_position = PositionVector(110,110, 5)
+    goal_position = PositionVector(110,110, 10)
     fw_agent_psi_dg = 45
     fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
     fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
                                  max_climb_angle_dg=5,
                                  max_psi_turn_dg=25)
-    fw_agent.leg_m = 10
+    fw_agent.leg_m = 15
 
     fw_agent.set_goal_state(goal_position)
 

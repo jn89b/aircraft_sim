@@ -13,21 +13,65 @@ from src.math_lib.VectorOperations import ca_euler_dcm_body_to_inertial, \
     ca_euler_dcm_inertial_to_body
  
 
+def add_noise_to_states(states:np.ndarray) -> np.ndarray:
+    """
+    Adds noise to the start of the aircraft  
+    """
+    deg_noise = np.deg2rad(1.0)
+    dist_noise = 1.0
+
+    states[0] += random.uniform(-dist_noise, dist_noise)
+    states[1] += random.uniform(-dist_noise, dist_noise)
+    states[2] += random.uniform(-dist_noise, dist_noise)
+    states[3] += random.uniform(-dist_noise, dist_noise)
+    states[4] += random.uniform(-dist_noise, dist_noise)
+    states[5] += random.uniform(-dist_noise, dist_noise)
+    states[6] += random.uniform(-deg_noise, deg_noise)
+    states[7] += random.uniform(-deg_noise, deg_noise)
+    states[8] += random.uniform(-deg_noise, deg_noise)
+    states[9] += random.uniform(-deg_noise, deg_noise)
+    states[10] += random.uniform(-deg_noise, deg_noise)
+    states[11] += random.uniform(-deg_noise, deg_noise)
+
+    return states
+
+def add_noise_to_linear_states(states:np.ndarray) -> np.ndarray:
+    """
+    Adds noise to the start of the aircraft  
+    """
+    deg_noise = np.deg2rad(2.0)
+    dist_noise = 1.0
+
+    states[5] += random.uniform(-dist_noise, dist_noise)
+    states[11] += random.uniform(-dist_noise, dist_noise)
+    states[4] += random.uniform(-dist_noise, dist_noise)
+    states[0] += random.uniform(-dist_noise, dist_noise)
+    states[6] += random.uniform(-dist_noise, dist_noise)
+    states[1] += random.uniform(-dist_noise, dist_noise)
+    states[9] += random.uniform(-deg_noise, deg_noise)
+    states[3] += random.uniform(-deg_noise, deg_noise)
+    states[10] += random.uniform(-deg_noise, deg_noise)
+    states[7] += random.uniform(-deg_noise, deg_noise)
+    states[2] += random.uniform(-deg_noise, deg_noise)
+    states[8] += random.uniform(-deg_noise, deg_noise)
+
+    return states
+
 def convert_lin_states_to_regular(states:np.ndarray) -> np.ndarray:
     """
      Given states modeled as linearized states :
-        [u, 
-         w, 
-         q, 
-         theta, 
-         h, 
-         x, 
-         v, 
-         p, 
-         r, 
-         phi, 
-         psi, 
-         y]
+        [u, 0
+         w, 1
+         q, 2
+         theta,3 
+         h, 4
+         x, 5  
+         v, 6
+         p, 7
+         r, 8
+         phi,9  
+         psi, 10
+         y]11
         
     Returns the states in the regular order:
         [x, 
@@ -46,18 +90,18 @@ def convert_lin_states_to_regular(states:np.ndarray) -> np.ndarray:
     To do:
         - Have this use an index configuration to avoid confusion
     """
-    return np.array([states[5], 
-                     states[11], 
-                     states[4], 
-                     states[0], 
-                     states[6], 
-                     states[1], 
-                     states[9], 
-                     states[3], 
-                     states[10], 
-                     states[7], 
-                     states[2], 
-                     states[8]])
+    return np.array([states[5], #x   
+                     states[11], #y 
+                     states[4], #z
+                     states[0], #u
+                     states[6], #v
+                     states[1], #w
+                     states[9], #phi
+                     states[3], #theta
+                     states[10], #psi
+                     states[7], #p
+                     states[2], #q
+                     states[8]]) #r
     
 def convert_lin_controls_to_regular(controls:np.ndarray) -> np.ndarray:
     """
@@ -79,26 +123,38 @@ def convert_lin_controls_to_regular(controls:np.ndarray) -> np.ndarray:
 def convert_regular_states_to_lin(states:np.ndarray) -> np.ndarray:
     """
     Given states in the regular order:
-        [x, y, z, u, v, w, phi, theta, psi, p, q, r]
-        
+        [x, 
+         y, 
+         z, 
+         u, 3 
+         v, 4
+         w, 5
+         phi,6 
+         theta, 7 
+         psi, 8
+         p, 9 
+         q, 10
+         r] 11
+         
     Returns the states modeled as linearized states :
-        [u, w, q, theta, h, x, v, p, r, phi, psi, y]
+        [u, 
+         w, q, theta, h, x, v, p, r, phi, psi, y]
         
     To do:
         - Have this use an index configuration to avoid confusion
     """
-    return np.array([states[3], 
-                     states[1], 
-                     states[10], 
-                     states[7], 
-                     states[2], 
-                     states[0], 
-                     states[6], 
-                     states[11], 
-                     states[9], 
-                     states[5], 
-                     states[4], 
-                     states[8]])
+    return np.array([states[3], #u  
+                     states[5], #w
+                     states[10], #q
+                     states[7], #theta
+                     states[2], #h
+                     states[0],  #x
+                     states[4], #v
+                     states[9], #p 
+                     states[11], #r
+                     states[6],  #phi 
+                     states[8], #psi
+                     states[2]]) #y
     
 def convert_regular_controls_to_lin(controls:np.ndarray) -> np.ndarray:
     """
@@ -373,6 +429,8 @@ class AircraftDynamicsV2():
         Yb = (Q*S*CY) / m
         Zb = (Q*S*CZ) / m
         
+        print("force in body frame: ", np.array([Xb, Yb, Zb]))
+        
         # state moments
         Lb = roll_moment*Q*S*b
         Mb = (Q*S*b*CM*c) / m
@@ -391,7 +449,7 @@ class AircraftDynamicsV2():
         
         # dynamic equations
         # accelerations in the body frame
-        u_dot = Xb + gravity_body[0] + (r*v) - (q*w) 
+        u_dot = Xb - gravity_body[0] + (r*v) - (q*w) 
         v_dot = Yb + gravity_body[1] - (r*u) + (p*w)
         w_dot = Zb + gravity_body[2] + (q*u) - (p*v)
         
@@ -410,9 +468,6 @@ class AircraftDynamicsV2():
         p_dot = (Lb +  (Ixx - Iyy) * q * r)  / Ixx
         q_dot = (Mb - (Izz - Iyy) * p * q) / Iyy
         r_dot = (Nb + (Ixx - Izz) * p * q) / Izz
-        # p_dot	= Izz*Lb -(Izz*(Izz - Iyy)*r)*q / (Ixx*Izz)
-        # q_dot   = Mb - (Ixx - Izz)*p*r / Iyy
-        # r_dot   = Ixx*Nb - (Ixx*(Ixx - Iyy)*p)*q / (Ixx*Izz)
         
         B = compute_B_matrix(phi, theta, psi)
         phi_theta_psi_dot = np.matmul(B, np.array([p, q, r]))
@@ -787,9 +842,9 @@ class AircraftDynamics():
     
         # compute angular accelerations 
         p_q_r_dot = self.compute_ang_acc(moments, states)    
-        p_q_r_dot = np.clip(-Config.MAX_RADIAN, 
-                            Config.MAX_RADIAN, 
-                            p_q_r_dot)
+        # p_q_r_dot = np.clip(-Config.MAX_RADIAN, 
+        #                     Config.MAX_RADIAN, 
+        #                     p_q_r_dot)
         
         phi = states[6]
         theta = states[7]
@@ -820,7 +875,7 @@ class AircraftDynamics():
         mass = self.aircraft.aircraft_params['mass']
         
         #accelerations
-        u_dot = forces[0]/mass + gravity_body_frame[0] - (q*w)  + (r*v)
+        u_dot = forces[0]/mass - gravity_body_frame[0] - (q*w)  + (r*v)
         v_dot = forces[1]/mass + gravity_body_frame[1] - (r*u)  + (p*w)
         w_dot = forces[2]/mass + gravity_body_frame[2] - (p*v)  + (q*u)
 

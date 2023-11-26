@@ -41,8 +41,9 @@ def euler_dcm_inertial_to_body(phi_rad:float,
     cos_psi = np.cos(psi_rad)
     sin_psi = np.sin(psi_rad)
     
-    if cos_theta <= 0.00001:
-        cos_theta = 0.00001*np.sign(cos_theta)
+    # if cos_theta <= 0.00001:
+    #     cos_theta = 0.00001*np.sign(cos_theta)
+        
     
     # Compute the DCM elements    
     dcm = np.array([[cos_theta * cos_psi, cos_theta * sin_psi, -sin_theta],

@@ -206,7 +206,6 @@ class ModelPredictiveControl():
         
         self.state_init = ca.DM(start)        # initial state
         self.state_target = ca.DM(goal)  # target state
-        print("state_init: ", self.state_init)
         self.controls = ca.DM(controls)  # initial control
         # self.t0 = t0
         #self.u0 = ca.DM.zeros((self.n_controls, self.N))  # initial control 
