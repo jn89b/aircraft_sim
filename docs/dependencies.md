@@ -4,3 +4,4 @@
 - pip3 install seaborn
 - pip3 install numpy 
 - pip3 install slycot
+- pip3 install numba

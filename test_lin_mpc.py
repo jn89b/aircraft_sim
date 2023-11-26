@@ -96,8 +96,8 @@ lin_mpc_constraints = {
     'p_max': np.deg2rad(60),
     'r_min': np.deg2rad(-60),
     'r_max': np.deg2rad(60),
-    'phi_min': np.deg2rad(-60),
-    'phi_max': np.deg2rad(60)
+    'phi_min': np.deg2rad(-45),
+    'phi_max': np.deg2rad(45)
 }
 
 states = {
@@ -376,16 +376,12 @@ for i in range(N):
             dx = goal_x - start_state[5]
             dz = goal_h - start_state[4]
             error = np.sqrt(dx**2 + dy**2 + dz**2)
-            
-            #every 5 seconds, check if the error is less than the tolerance
-            
-            
             # if error <= tolerance:
             print("error: ", error)
+            
         if j == wp_max - idx_start:
             FINISHED = True
             break
-            
 
 #%% 
 x_ned = [x[0] for x in position_history]

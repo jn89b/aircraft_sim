@@ -97,11 +97,13 @@ class Radar():
 
         azmith_bearing_dgs = np.arange(min_dg-1, max_dg+1)
         
-        #could do this in parallel 
+        #Run this in parallel and also use numba for fast_voxel
         for bearing in azmith_bearing_dgs:
-
+            
             r_max_x = self.pos.x + self.radar_range_m*np.cos(np.deg2rad(bearing))
             r_max_y = self.pos.y + self.radar_range_m*np.sin(np.deg2rad(bearing))
+            
+            #this needs to be done faster with numba and parallelized
             bearing_rays = fast_voxel_algo(self.pos.x , self.pos.y, 
                                         r_max_x, r_max_y, obs_list)
             detection_voxels.extend(bearing_rays)

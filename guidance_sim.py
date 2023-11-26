@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     #load simple sim
     start_position = PositionVector(10,60,5)
-    goal_position = PositionVector(110,110, 10)
+    goal_position = PositionVector(355,200, 10)
     fw_agent_psi_dg = 45
     fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
     fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
@@ -72,17 +72,24 @@ if __name__ == '__main__':
     fw_agent.set_goal_state(goal_position)
 
     ## create grid
-    grid = Grid(fw_agent, 120, 120, 100, 5, 5, 0)
+    x_max = 750
+    y_max = 750
+    grid = Grid(fw_agent, x_max, y_max, 100, 5, 5, 0)
     
     # obs_positions = [(40,60,10)]
 
     #set random seed
+    num_obstacles = 150
     np.random.seed(1)
     obs_positions = []
-    for i in range(15):
-        x = np.random.randint(0, 120)
-        y = np.random.randint(0, 120)
+    for i in range(num_obstacles):
+        x = np.random.randint(0, 350)
+        y = np.random.randint(0, 350)
         z = np.random.randint(0, 100)
+
+        #check if obstacle within 50m of start or goal
+        if np.linalg.norm(np.array([x,y,z]) - np.array([start_position.x, start_position.y, start_position.z])) < 50:
+            continue
 
         obs_positions.append((x,y,z))
 
