@@ -76,8 +76,9 @@ def fast_voxel_algo3D(x0:float, y0:float, z0:float,
 
 
     cell_rays = []
-    curr_pos = np.array([x,y,z])
     for i in range(n):        
+        curr_pos = np.array([x,y,z])
+
         if obs_list:
             for obs in obs_list:
                 obs_position = np.array([obs[0], obs[1], obs[2]])
@@ -182,16 +183,16 @@ def fast_voxel_algo3D_jit(x0:float, y0:float, z0:float,
 
     # cell_rays = []
     #empty numpy array
-    current_position = np.array([x,y,z])
     #check if current position is 10 10 10
     cell_rays = np.empty((n,3))
     for i in range(n):        
+        current_position = np.array([x,y,z])
         if obs_list:
             for obs in obs_list:
                 obs_position = np.array([obs[0], obs[1], obs[2]])
                 obs_radius = obs[3]
                 if is_inside2D_jit(current_position, obs_position, obs_radius) == True:
-                    return cell_rays
+                    return cell_rays[:i]
                     
         # cell_rays.append((x,y,z))
         cell_rays[i,0] = x
@@ -251,10 +252,7 @@ def is_inside2D_jit(current_position:np.ndarray,
     dy = current_position[1] - obstacle_position[1]
     dist = m.sqrt(dx**2 + dy**2)
     if dist <= radius_obs_m:
-        # print("dx", dx)
-        # print("dy", dy)
-        # print("current_position", current_position)
-        # print("obstacle_position", obstacle_position)
+        print(dist)
         return True
     else:
         return False
@@ -271,19 +269,17 @@ def check_obstacles(obstacle_list:np.ndarray,
     return False
         
 
-
-
 #%% Checking obstacle inside with no jit and jit
 obstacles = []
 N_obstacles = 50
 for i in range(N_obstacles):
-    x = np.random.randint(500, 1000)
-    y = np.random.randint(500, 1000)
-    z = np.random.randint(500, 1000)
-    if i == 0:
-        x = 10
-        y = 10
-        z = 10
+    x = np.random.randint(50, 100)
+    y = np.random.randint(50, 100)
+    z = np.random.randint(50, 100)
+    # if i == 0:
+    #     x = 10
+    #     y = 10
+    #     z = 10
         
     radius = 2
     obstacles.append((x,y,z, radius))
@@ -316,11 +312,11 @@ x_0 = 0
 y_0 = 0
 z_0 = 0
 
-x_end = 250
-y_end = 250
-z_end = 250
+x_end = 100
+y_end = 100
+z_end = 100
 
-PLOT = False
+PLOT = True
 
 start_time = time.time()
 cell_rays_no_jit = fast_voxel_algo3D(x_0, y_0, z_0, x_end, y_end, z_end, obstacles)
@@ -333,12 +329,15 @@ y_end = 10
 z_end = 10
 cell_rays_jit = fast_voxel_algo3D_jit(x_0, y_0, z_0, x_end, y_end, z_end, typed_obstacle_list)   
 
-x_end = 250
-y_end = 250
-z_end = 250
+x_end = 100
+y_end = 100
+z_end = 100
 start_time = time.time()
 cell_rays_jit = fast_voxel_algo3D_jit(x_0, y_0, z_0, x_end, y_end, z_end, typed_obstacle_list)   
 jit_time = time.time() - start_time
+#remove nans from cell rays
+# cell_rays_jit = cell_rays_jit[~np.isnan(cell_rays_jit).any(axis=1)]
+
 print("--- %s seconds with jit ---" % jit_time)
 print("speedup raytrace:", no_jit/jit_time)
 
@@ -352,4 +351,15 @@ import pandas as pd
 cell_rays_jit = pd.DataFrame(cell_rays_jit, columns=['x','y','z'])
 if PLOT == True:
     fig = px.scatter_3d(cell_rays_jit, x='x', y='y', z='z')
+    
+    #plot obstacles
+    obs_df = pd.DataFrame(obstacles, columns=['x','y','z','radius'])
+    
+    fig.add_trace(go.Scatter3d(x=obs_df['x'], y=obs_df['y'], z=obs_df['z'],
+                                 mode='markers', marker=dict(size=obs_df['radius']*10)))
+    
+    #
+    
     fig.show()
+    
+    
