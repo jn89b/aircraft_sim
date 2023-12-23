@@ -26,6 +26,9 @@ pio.renderers.default='browser'
 
 '''CLASS'''
 class Terrain():
+    """
+    
+    """
     def __init__(self, map_used:str, lon_min:float , lon_max:float, 
                  lat_min:float, lat_max:float):
         self.map_used = map_used
@@ -34,9 +37,37 @@ class Terrain():
         self.lat_min = lat_min
         self.lat_max = lat_max
         
-        self.origin_latlon = (self.lat_min, self.lon_min)
-        self.origin_cartesian = self.cartesian_from_latlon()
+        self.origin_latlon    = (self.lat_min, self.lon_min)
+        self.max_latlon       = (self.lat_max, self.lon_max)
         
+        self.min_x, self.min_y, self.min_z = self.cartesian_from_latlon(lat_min, lon_min) 
+        self.max_x, self.max_y, self.max_z = self.cartesian_from_latlon(lat_max, lon_max) 
+        self.elevations        = self.generate_elevations()
+        
+    def print_information(self) -> None:
+        print("The map used is " + self.map_used)
+        print("The minimum longitude is " + str(self.lon_min))
+        print("The maximum longitude is " + str(self.lon_max))
+        print("The minimum latitude is " + str(self.lat_min))
+        print("The maximum latitude is " + str(self.lat_max))
+        
+        print("The origin lat lon is " + str(self.origin_latlon))
+        print("The max lat lon is " + str(self.max_latlon))
+        
+        print("The min x is " + str(self.min_x))
+        print("The min y is " + str(self.min_y))
+        print("The max x is " + str(self.max_x))
+        print("The max y is " + str(self.max_y))
+        
+        min_bounds = [self.min_x, self.min_y]
+        max_bounds = [self.max_x, self.max_y]
+        
+        print("The min bounds are " + str(min_bounds))
+        print("The max bounds are " + str(max_bounds))
+        
+        distance = math.dist(min_bounds, max_bounds)
+        print("The distance between the coordinates is approximately " + str(distance) + " meters.")
+                
     ''' USED BY GET ELEVATION FUNCTION TO GET THE LENGTH OF THE ARRAY'''
     def length_of_map(self):
         with rasterio.open(self.map_used) as src:
@@ -87,6 +118,9 @@ class Terrain():
     
     '''RETURNS THE ELEVATION OF ANY GIVEN EARTH COORDINATES WITHIN THE ARRAY'''
     def get_elevation(self, x:float, y:float):
+        """
+        This x and y are the lat and lon of the point of intrest
+        """
         x_pos = self.get_x_coor(x)
         y_pos = self.get_y_coor(y)
         
@@ -116,10 +150,10 @@ class Terrain():
 
         plt.show()
 
-    '''POOP'''
-    def plot_3d_plotly(self):
+    def generate_elevations(self):
         with rasterio.open(self.map_used) as src:
-            window = src.window(self.lon_min, self.lat_min, self.lon_max, self.lat_max)
+            window = src.window(
+                self.lon_min, self.lat_min, self.lon_max, self.lat_max)
             area_of_intrest = src.read(1, window=window)
         
         x1 = np.arange(0, self.length_of_map(), 1)
@@ -146,7 +180,7 @@ class Terrain():
     
     '''PLOTS IN 3D USING PLOTLY'''
     def plot_3d_expanded(self, step_number:int, z_min:float , z_max:float):
-        z1 = self.plot_3d_plotly()
+        z1 = self.generate_elevations()
         expanded_array = self.expand_array(z1, step_number)
         x1 = np.arange(0, expanded_array.shape[0], 1)
         y1 = np.arange(0, expanded_array.shape[1], 1)
@@ -166,22 +200,52 @@ class Terrain():
                 
         fig.show()
         
-    def cartesian_from_latlon(self):
+    def cartesian_from_latlon(
+        self, lat:float, lon:float, include_bias:bool=False) -> tuple:
         """
         returns the cartesian coordinates of a given lat lon point
+        if include_bias is true, then the bias is included in the output
         """ 
-        R = 6378.137 # Radius of earth in KM
-        x = R * math.cos(self.origin_latlon[0] * math.pi / 180) * math.cos(self.origin_latlon[1] * math.pi / 180)
-        y = R * math.cos(self.origin_latlon[0] * math.pi / 180) * math.sin(self.origin_latlon[1] * math.pi / 180)
-        z = R * math.sin(self.origin_latlon[0] * math.pi / 180)
+        R = 6371.0 # Radius of earth in KM
+        lat_rad = math.radians(lat)
+        lon_rad = math.radians(lon)
+
+        # Convert to Cartesian coordinates
+        x = R * math.cos(lat_rad) * math.cos(lon_rad)
+        y = R * math.cos(lat_rad) * math.sin(lon_rad)
+        z = R * math.sin(lat_rad)
         
+        if include_bias ==  True:
+            x = x - self.min_x
+            y = y - self.min_y
+            z = z - self.min_z
+        
+        #convert to meters
+        x = x * 1000
+        y = y * 1000
+        z = z * 1000
+            
         return x, y, z
     
-    def elevation_from_cartesian(self, x:float, y:float) -> float:
+    def latlon_from_cartesian(
+        self, x:float, y:float, z:float, include_bias:bool=False) -> tuple:
         """
-        returns the elevation of a given x,y point
+        Convert cartesian coordinates to lat lon coordinates in degrees
         """
+
+        lat_rad = math.atan2(z, math.sqrt(x**2 + y**2))
+        lon_rad = math.atan2(y, x)
         
+        lat_dg = math.degrees(lat_rad)
+        lon_dg = math.degrees(lon_rad)
+
+        # if include_bias ==  True:
+        #     lat = lat + self.lat_min
+        #     lon = lon + self.lon_min
+            
+        return lat_dg, lon_dg
+    
+    
 '''INSTANCES'''
 grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                        lon_min = -112.55, 
@@ -191,8 +255,21 @@ grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif',
 
 distance = measure_latlon_distance(36.2, -112.55, 36.35, -112.4)
 
-cartesian_point = grand_canyon.cartesian_from_latlon()
-print(cartesian_point)
+min_x = grand_canyon.min_x
+min_y = grand_canyon.min_y
+min_z = grand_canyon.min_z
+
+lat_lon = grand_canyon.latlon_from_cartesian(min_x, min_y, min_z)
+grand_canyon.print_information()
+
+max_x = grand_canyon.max_x
+max_y = grand_canyon.max_y
+max_z = grand_canyon.max_z
+
+max_lat_lon = grand_canyon.latlon_from_cartesian(max_x, max_y, max_z)
+
+# cartesian_point = grand_canyon.cartesian_from_latlon()
+# print(cartesian_point)
 
 '''
 lgtf = Terrain(map_used = 'sullivan_indiana.tif', 
