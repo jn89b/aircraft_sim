@@ -69,8 +69,8 @@ if __name__=="__main__":
         init_states,
         controls)
     
-    aircraft_dynamics_eulers = AircraftDynamicsV2(aircraft_info_euler)
-    aircraft_dynamics_rk = AircraftDynamicsV2(aircraft_info_rk)
+    aircraft_dynamics_eulers = AircraftDynamics(aircraft_info_euler)
+    aircraft_dynamics_rk = AircraftDynamics(aircraft_info_rk)
 
     dt = 0.01        
     t_init = 0.0

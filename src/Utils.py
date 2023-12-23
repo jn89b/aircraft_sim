@@ -36,3 +36,19 @@ def read_lon_matrices(file_path):
 
     return matrix_a, B
 
+def measure_latlon_distance(lat1:float, lon1:float, 
+                     lat2:float, lon2:float, 
+                     x_offset:float=0, 
+                     y_offset:float=0) -> tuple:
+    """
+    returns the distance between two lat lon points in meters
+    """
+    R = 6378.137 # Radius of earth in KM
+    d_lat = lat2 * np.pi / 180 - lat1 * np.pi / 180
+    d_lon = lon2 * np.pi / 180 - lon1 * np.pi / 180
+    a = np.sin(d_lat/2) * np.sin(d_lat/2) + np.cos(lat1 * np.pi / 180) * np.cos(lat2 * np.pi / 180) * np.sin(d_lon/2) * np.sin(d_lon/2)
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+    d = R * c * 1000
+
+    return d
+    

@@ -4,6 +4,8 @@ import numpy as np
 import time 
 import sys
 import math as m
+
+
 # from src.guidance_lib.src.PositionVector import PositionVector
 def fast_voxel_algo3D(x0:float, y0:float, z0:float, 
                       x1:float, y1:float, z1:float, 
@@ -271,11 +273,11 @@ def check_obstacles(obstacle_list:np.ndarray,
 
 #%% Checking obstacle inside with no jit and jit
 obstacles = []
-N_obstacles = 50
+N_obstacles = 2
 for i in range(N_obstacles):
-    x = np.random.randint(50, 100)
-    y = np.random.randint(50, 100)
-    z = np.random.randint(50, 100)
+    x = np.random.randint(750, 1000)
+    y = np.random.randint(750, 1000)
+    z = np.random.randint(750, 1000)
     # if i == 0:
     #     x = 10
     #     y = 10
@@ -312,9 +314,9 @@ x_0 = 0
 y_0 = 0
 z_0 = 0
 
-x_end = 100
-y_end = 100
-z_end = 100
+x_end = 1000
+y_end = 1000
+z_end = 1000
 
 PLOT = True
 
@@ -329,17 +331,17 @@ y_end = 10
 z_end = 10
 cell_rays_jit = fast_voxel_algo3D_jit(x_0, y_0, z_0, x_end, y_end, z_end, typed_obstacle_list)   
 
-x_end = 100
-y_end = 100
-z_end = 100
+x_end = 1000
+y_end = 1000
+z_end = 1000
 start_time = time.time()
 cell_rays_jit = fast_voxel_algo3D_jit(x_0, y_0, z_0, x_end, y_end, z_end, typed_obstacle_list)   
 jit_time = time.time() - start_time
 #remove nans from cell rays
-# cell_rays_jit = cell_rays_jit[~np.isnan(cell_rays_jit).any(axis=1)]
 
 print("--- %s seconds with jit ---" % jit_time)
 print("speedup raytrace:", no_jit/jit_time)
+
 
 #%% Plotting
 #plot the results with plotly

@@ -88,7 +88,8 @@ if __name__ == '__main__':
         z = np.random.randint(0, 100)
 
         #check if obstacle within 50m of start or goal
-        if np.linalg.norm(np.array([x,y,z]) - np.array([start_position.x, start_position.y, start_position.z])) < 50:
+        if np.linalg.norm(np.array([x,y,z]) - np.array([
+                start_position.x, start_position.y, start_position.z])) < 50:
             continue
 
         obs_positions.append((x,y,z))

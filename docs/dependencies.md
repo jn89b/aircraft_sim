@@ -5,3 +5,6 @@
 - pip3 install numpy 
 - pip3 install slycot
 - pip3 install numba
+- pip3 install rasterio
+- pip3 install geopandas
+- pip3 install richdem
