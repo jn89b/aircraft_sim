@@ -8,3 +8,4 @@
 - pip3 install rasterio
 - pip3 install geopandas
 - pip3 install richdem
+- pip3 install pyproj

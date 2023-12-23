@@ -26,3 +26,11 @@ RHO = 1.225
 
 #Target options
 TARGET_DISCHARGE_RATE = 0.1
+
+
+utm_param = {
+    'grand_canyon': 'espg:32612',
+    'kansas_city': 'espg:32614',
+    'new_york': 'espg:32618',
+    'indiana': 'espg:32616',
+}

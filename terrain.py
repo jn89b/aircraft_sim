@@ -21,27 +21,46 @@ import pandas as pd
 import plotly.io as pio
 
 from src.Utils import measure_latlon_distance
+from src.config.Config import utm_param
+
+import pyproj
+from pyproj import Proj, transform
+
 
 pio.renderers.default='browser'
 
 '''CLASS'''
 class Terrain():
     """
+    Utilizes UTMs to convert lat lon to cartesian coordinates
+    
     
     """
     def __init__(self, map_used:str, lon_min:float , lon_max:float, 
-                 lat_min:float, lat_max:float):
+                 lat_min:float, lat_max:float,
+                 utm_zone:str = 'espg:32612'):
         self.map_used = map_used
         self.lon_min = lon_min
         self.lon_max = lon_max
         self.lat_min = lat_min
         self.lat_max = lat_max
         
-        self.origin_latlon    = (self.lat_min, self.lon_min)
-        self.max_latlon       = (self.lat_max, self.lon_max)
+        self.origin_latlon = (self.lat_min, self.lon_min)
+        self.max_latlon = (self.lat_max, self.lon_max)
         
-        self.min_x, self.min_y, self.min_z = self.cartesian_from_latlon(lat_min, lon_min) 
-        self.max_x, self.max_y, self.max_z = self.cartesian_from_latlon(lat_max, lon_max) 
+        self.wgs84 = pyproj.Proj(init='epsg:4326')
+        
+        ## this is stupid but you have to hard code the utm zone
+        self.utm_zone = pyproj.Proj(init='epsg:32612')
+        
+        self.min_x, self.min_y = pyproj.transform(
+            self.wgs84, self.utm_zone, self.lon_min, self.lat_min)
+        
+        self.max_x , self.max_y = pyproj.transform(
+            self.wgs84, self.utm_zone, self.lon_max, self.lat_max)
+        
+        # self.min_x, self.min_y, self.min_z = self.cartesian_from_latlon(lat_min, lon_min) 
+        # self.max_x, self.max_y, self.max_z = self.cartesian_from_latlon(lat_max, lon_max) 
         self.elevations        = self.generate_elevations()
         
     def print_information(self) -> None:
@@ -59,15 +78,7 @@ class Terrain():
         print("The max x is " + str(self.max_x))
         print("The max y is " + str(self.max_y))
         
-        min_bounds = [self.min_x, self.min_y]
-        max_bounds = [self.max_x, self.max_y]
         
-        print("The min bounds are " + str(min_bounds))
-        print("The max bounds are " + str(max_bounds))
-        
-        distance = math.dist(min_bounds, max_bounds)
-        print("The distance between the coordinates is approximately " + str(distance) + " meters.")
-                
     ''' USED BY GET ELEVATION FUNCTION TO GET THE LENGTH OF THE ARRAY'''
     def length_of_map(self):
         with rasterio.open(self.map_used) as src:
@@ -247,26 +258,40 @@ class Terrain():
     
     
 '''INSTANCES'''
-grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
-                       lon_min = -112.55, 
-                       lon_max = -112.4, 
-                       lat_min = 36.2, 
-                       lat_max = 36.35)
+# grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
+#                        lon_min = -112.55, 
+#                        lon_max = -112.4, 
+#                        lat_min = 36.2, 
+#                        lat_max = 36.35)
 
-distance = measure_latlon_distance(36.2, -112.55, 36.35, -112.4)
+#has to be a square
+grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
+                       lon_min = -112.5, 
+                       lon_max = -112.45, 
+                       lat_min = 36.2, 
+                       lat_max = 36.25,
+                       utm_zone=utm_param['grand_canyon'])
+
+
+grand_canyon.print_information()
 
 min_x = grand_canyon.min_x
 min_y = grand_canyon.min_y
-min_z = grand_canyon.min_z
-
-lat_lon = grand_canyon.latlon_from_cartesian(min_x, min_y, min_z)
-grand_canyon.print_information()
 
 max_x = grand_canyon.max_x
 max_y = grand_canyon.max_y
-max_z = grand_canyon.max_z
 
-max_lat_lon = grand_canyon.latlon_from_cartesian(max_x, max_y, max_z)
+distance = np.linalg.norm(np.array([min_x, min_y]) - np.array([max_x, max_y]))
+# distance = measure_latlon_distance(
+#     lat1=lat_lon[0], lon1=lat_lon[1], lat2=max_lat_lon[0], lon2=max_lat_lon[1])
+print("The distance between the min and max lat lon is " + str(distance) + "m")
+
+dx = max_x - min_x
+dy = max_y - min_y
+
+
+print("The dx is " + str(dx) + "m")
+print("The dy is " + str(dy) + "m")
 
 # cartesian_point = grand_canyon.cartesian_from_latlon()
 # print(cartesian_point)
@@ -297,7 +322,7 @@ lgtf = Terrain(map_used = 'sullivan_indiana.tif',
 # grand_canyon.print_map()
 # grand_canyon.print_whole_map()
 # grand_canyon.plot_3d_matlib()
-# grand_canyon.plot_3d_expanded(3 , 0 , 16000)
+grand_canyon.plot_3d_expanded(3 , 0 , 16000)
 
 
 # lgtf.plot_3d_expanded(15 , 0 , 1600)
