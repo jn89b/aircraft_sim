@@ -12,6 +12,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 import math
 from rasterio.windows import Window
+from rasterio.windows import from_bounds
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -24,8 +25,9 @@ from src.Utils import measure_latlon_distance
 from src.config.Config import utm_param
 
 import pyproj
-from pyproj import Proj, transform
+from pyproj import Proj, transform, Transformer
 
+import time 
 
 pio.renderers.default='browser'
 
@@ -33,7 +35,6 @@ pio.renderers.default='browser'
 class Terrain():
     """
     Utilizes UTMs to convert lat lon to cartesian coordinates
-    
     
     """
     def __init__(self, map_used:str, lon_min:float , lon_max:float, 
@@ -58,11 +59,139 @@ class Terrain():
         
         self.max_x , self.max_y = pyproj.transform(
             self.wgs84, self.utm_zone, self.lon_max, self.lat_max)
+
+        #this is also stupid I had to hardcode this
+        self.transformer = Transformer.from_crs(
+            32612, 4326, always_xy=True)
         
-        # self.min_x, self.min_y, self.min_z = self.cartesian_from_latlon(lat_min, lon_min) 
-        # self.max_x, self.max_y, self.max_z = self.cartesian_from_latlon(lat_max, lon_max) 
-        self.elevations        = self.generate_elevations()
+        with rasterio.open(self.map_used) as src:
+            self.src = src
+            print("bounds are " + str(src.bounds))
+            self.elevations = src.read(1)
+            
+            #get size of index
+            print("len of index is" + str(len(self.elevations)))
+        # self.cartesian_elevations = self.get_cartesian_elevation_hash()
         
+    def get_latlon_elevation_hash(self) -> dict:
+        """
+        Returns a hash of the gps coordinates and their elevations
+        """
+        with rasterio.open(self.map_used) as src:  
+            area_of_interest = src.read(1, window=from_bounds(
+                left=self.lon_min, bottom=self.lat_min, 
+                right=self.lon_max, top=self.lat_max, 
+                transform=src.transform))
+            
+            area_of_interest = area_of_interest
+            
+            height = area_of_interest.shape[0]
+            width = area_of_interest.shape[1]
+            cols, rows = np.meshgrid(np.arange(width), np.arange(height))
+            
+            #lat lon coordinates of the area of interest
+            xs, ys = rasterio.transform.xy(src.transform, rows, cols)
+            lons = np.array(xs)
+            # lons = np.array(xs)
+            lats = np.array(ys)
+        
+        self.xs = xs
+        self.ys = ys
+        self.lon_coords = xs
+        self.lat_coords = lats
+        
+        self.lons = lons
+        self.lats = lats
+    
+        latlon_hash = {}
+        # for i in range(len(self.lon_coords)):
+        #     for j in range(len(self.lat_coords)):
+        #         #keep 4 digits of precision
+        #         print(self.lat_coords[j], self.lon_coords[i])   
+        #         lat_key = round(self.lat_coords[j], 4)
+        #         lon_key = round(self.lon_coords[i], 4)
+        #         latlon_hash[(lat_key, lon_key)] = area_of_interest[j,i]
+
+        return latlon_hash
+
+    def get_elevation_from_latlon(self, lon_dg:float, lat_dg:float):
+        """returns the elevation of a given lat lon point"""
+        # print("The lat lon is " + str(lat_dg) + " " + str(lon_dg))
+        
+        #truncate to 4 digits of precision
+        lat_dg = round(lat_dg, 4)
+        lon_dg = round(lon_dg, 4)
+        
+        idx = self.src.index(lon_dg, lat_dg) 
+       
+        #check if the index is in the bounds of the map
+        #return self.src.xy(*idx), self.elevations[idx]
+        return self.elevations[idx]
+
+    def cartesian_from_latlon(self,
+                                lat_dg:float,
+                                lon_dg:float,
+                                include_bias:bool=False) -> tuple:
+            """
+            returns the cartesian coordinates of a given lat_dg lon_dg point
+            """        
+            x,y = self.transformer.transform(
+                lon_dg, lat_dg)
+            
+            return x, y
+        
+    def latlon_from_cartesian(self,
+                                x:float,
+                                y:float,
+                                include_bias:bool=True) -> tuple:
+            """
+            Convert cartesian coordinates to lat lon coordinates in degrees
+            """
+            if include_bias ==  True:
+                x = x + self.min_x
+                y = y + self.min_y
+                
+            lon_dg, lat_dg = self.transformer.transform(
+                x,y)
+            
+            return lat_dg, lon_dg
+        
+        
+    def get_cartesian_elevation_hash(self) -> dict:
+        """
+        returns a hash of the cartesian coordinates and their elevations
+        """
+        with rasterio.open(self.map_used) as src:
+            window = src.window(
+                self.lon_min, self.lat_min, self.lon_max, self.lat_max)
+            area_of_interest = src.read(1, window=window)
+            height = area_of_interest.shape[0]
+            width = area_of_interest.shape[1]
+            cols, rows = np.meshgrid(np.arange(width), np.arange(height))
+            
+            #lat lon coordinates of the area of interest
+            xs, ys = rasterio.transform.xy(src.transform, rows, cols)
+            # lons = np.array(xs)
+            lats = np.array(ys)[:,0]
+            
+        lon_coords = xs[0]
+        lat_coords = lats
+        
+        x_coords, y_coords = pyproj.transform(
+            self.wgs84, self.utm_zone, lon_coords, lat_coords)
+        
+        cartesian_elevation_hash = {}   
+        for i in range(len(y_coords)):
+            for j in range(len(x_coords)):
+                x_index = x_coords[j] - self.min_x
+                y_index = y_coords[i] - self.min_y
+                #keep 4 digits of precision
+                x_index = round(x_index, 4)
+                y_index = round(y_index, 4)
+                cartesian_elevation_hash[(y_index, x_index)] = area_of_interest[j,i]
+
+        return cartesian_elevation_hash        
+
     def print_information(self) -> None:
         print("The map used is " + self.map_used)
         print("The minimum longitude is " + str(self.lon_min))
@@ -88,7 +217,7 @@ class Terrain():
             return aoi_len
     
     '''RETURNS THE VALUE OF 1 SPECIFIC CELL IN THE ARRAY'''
-    def cell_of_intrest(self, y, x):
+    def cell_of_interest(self, y, x):
         with rasterio.open(self.map_used) as src:
             window = src.window(self.lon_min, self.lat_min, self.lon_max, self.lat_max)
             area_of_intrest = src.read(1, window=window)
@@ -101,6 +230,7 @@ class Terrain():
             window = src.window(self.lon_min, self.lat_min, self.lon_max, self.lat_max)
             area_of_intrest = src.read(1, window=window)
             rasterio.plot.show(area_of_intrest, cmap='bone')
+            
            
     '''PRINTS THE ENTIRE MAP WITH COORDINATE LINES'''
     def print_whole_map(self):
@@ -128,17 +258,17 @@ class Terrain():
         return relative_y_pos
     
     '''RETURNS THE ELEVATION OF ANY GIVEN EARTH COORDINATES WITHIN THE ARRAY'''
-    def get_elevation(self, x:float, y:float):
-        """
-        This x and y are the lat and lon of the point of intrest
-        """
-        x_pos = self.get_x_coor(x)
-        y_pos = self.get_y_coor(y)
+    # def get_elevation(self, x:float, y:float):
+    #     """
+    #     This x and y are the lat and lon of the point of intrest
+    #     """
+    #     x_pos = self.get_x_coor(x)
+    #     y_pos = self.get_y_coor(y)
         
-        print("The x cell is "+str(x_pos))
-        print("The y cell is "+str(y_pos))
+    #     print("The x cell is "+str(x_pos))
+    #     print("The y cell is "+str(y_pos))
         
-        print("The cell value is " + str(self.cell_of_intrest(y_pos, x_pos)) + "m")
+    #     print("The cell value is " + str(self.cell_of_interest(y_pos, x_pos)) + "m")
     
     '''PLOTS THE AREA OF INTREST IN 3D USING MATPLOTLIB'''
     def plot_3d_matlib(self):
@@ -210,51 +340,79 @@ class Terrain():
             scene = dict(zaxis = dict(nticks=4, range=[z_min, z_max])))
                 
         fig.show()
-        
-    def cartesian_from_latlon(
-        self, lat:float, lon:float, include_bias:bool=False) -> tuple:
-        """
-        returns the cartesian coordinates of a given lat lon point
-        if include_bias is true, then the bias is included in the output
-        """ 
-        R = 6371.0 # Radius of earth in KM
-        lat_rad = math.radians(lat)
-        lon_rad = math.radians(lon)
 
-        # Convert to Cartesian coordinates
-        x = R * math.cos(lat_rad) * math.cos(lon_rad)
-        y = R * math.cos(lat_rad) * math.sin(lon_rad)
-        z = R * math.sin(lat_rad)
+    def cartesian_from_latlon(self,
+                              lat_dg:float,
+                              lon_dg:float,
+                              include_bias:bool=False) -> tuple:
+        """
+        returns the cartesian coordinates of a given lat_dg lon_dg point
+        """        
+        x,y = pyproj.transform(
+            self.wgs84, self.utm_zone, lon_dg, lat_dg)
         
-        if include_bias ==  True:
-            x = x - self.min_x
-            y = y - self.min_y
-            z = z - self.min_z
-        
-        #convert to meters
-        x = x * 1000
-        y = y * 1000
-        z = z * 1000
-            
-        return x, y, z
+        return x, y
     
-    def latlon_from_cartesian(
-        self, x:float, y:float, z:float, include_bias:bool=False) -> tuple:
-        """
-        Convert cartesian coordinates to lat lon coordinates in degrees
-        """
-
-        lat_rad = math.atan2(z, math.sqrt(x**2 + y**2))
-        lon_rad = math.atan2(y, x)
-        
-        lat_dg = math.degrees(lat_rad)
-        lon_dg = math.degrees(lon_rad)
-
-        # if include_bias ==  True:
-        #     lat = lat + self.lat_min
-        #     lon = lon + self.lon_min
+    # def latlon_from_cartesian(self,
+    #                             x:float,
+    #                             y:float,
+    #                             include_bias:bool=True) -> tuple:
+    #         """
+    #         Convert cartesian coordinates to lat lon coordinates in degrees
+    #         """
+    #         if include_bias ==  True:
+    #             x = x + self.min_x
+    #             y = y + self.min_y
+                
+    #         lon_dg, lat_dg = pyproj.transform(
+    #             self.utm_zone, self.wgs84, x, y)
             
-        return lat_dg, lon_dg
+    #         return lat_dg, lon_dg
+        
+    # def cartesian_from_latlon(
+    #     self, lat:float, lon:float, include_bias:bool=False) -> tuple:
+    #     """
+    #     returns the cartesian coordinates of a given lat lon point
+    #     if include_bias is true, then the bias is included in the output
+    #     """ 
+    #     R = 6371.0 # Radius of earth in KM
+    #     lat_rad = math.radians(lat)
+    #     lon_rad = math.radians(lon)
+
+    #     # Convert to Cartesian coordinates
+    #     x = R * math.cos(lat_rad) * math.cos(lon_rad)
+    #     y = R * math.cos(lat_rad) * math.sin(lon_rad)
+    #     z = R * math.sin(lat_rad)
+        
+    #     if include_bias ==  True:
+    #         x = x - self.min_x
+    #         y = y - self.min_y
+    #         z = z - self.min_z
+        
+    #     #convert to meters
+    #     x = x * 1000
+    #     y = y * 1000
+    #     z = z * 1000
+            
+    #     return x, y, z
+    
+    # def latlon_from_cartesian(
+    #     self, x:float, y:float, z:float, include_bias:bool=False) -> tuple:
+    #     """
+    #     Convert cartesian coordinates to lat lon coordinates in degrees
+    #     """
+
+    #     lat_rad = math.atan2(z, math.sqrt(x**2 + y**2))
+    #     lon_rad = math.atan2(y, x)
+        
+    #     lat_dg = math.degrees(lat_rad)
+    #     lon_dg = math.degrees(lon_rad)
+
+    #     # if include_bias ==  True:
+    #     #     lat = lat + self.lat_min
+    #     #     lon = lon + self.lon_min
+            
+    #     return lat_dg, lon_dg
     
     
 '''INSTANCES'''
@@ -273,7 +431,7 @@ grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif',
                        utm_zone=utm_param['grand_canyon'])
 
 
-grand_canyon.print_information()
+# grand_canyon.print_information()
 
 min_x = grand_canyon.min_x
 min_y = grand_canyon.min_y
@@ -282,19 +440,69 @@ max_x = grand_canyon.max_x
 max_y = grand_canyon.max_y
 
 distance = np.linalg.norm(np.array([min_x, min_y]) - np.array([max_x, max_y]))
-# distance = measure_latlon_distance(
-#     lat1=lat_lon[0], lon1=lat_lon[1], lat2=max_lat_lon[0], lon2=max_lat_lon[1])
 print("The distance between the min and max lat lon is " + str(distance) + "m")
 
 dx = max_x - min_x
 dy = max_y - min_y
 
+# cartesian_hash = grand_canyon.cartesian_elevations
 
-print("The dx is " + str(dx) + "m")
-print("The dy is " + str(dy) + "m")
 
-# cartesian_point = grand_canyon.cartesian_from_latlon()
-# print(cartesian_point)
+
+time_list = []
+# for i in range(5):
+#     rand_lon = np.random.uniform(low=grand_canyon.lon_min, high=grand_canyon.lon_max)
+#     rand_lat = np.random.uniform(low=grand_canyon.lat_min, high=grand_canyon.lat_max)
+    
+#     init_time = time.time()
+#     elevation = grand_canyon.get_elevation_from_latlon(rand_lon, rand_lat)
+#     time_taken = time.time() - init_time
+#     print("The elevation at " + str(rand_lon) + " " + str(rand_lat) + " is " + str(elevation))
+#     print("Time taken is " + str(time_taken))
+#     time_list.append(time_taken)
+    
+# print("The average time taken is " + str(np.mean(time_list)))
+# print("total time taken is " + str(np.sum(time_list)))    
+    
+for i in range(25):
+    rand_x = np.random.uniform(low=min_x, high=max_x)
+    rand_y = np.random.uniform(low=min_y, high=max_y)
+    
+    init_time = time.time()
+    lat_dg, lon_dg = grand_canyon.latlon_from_cartesian(rand_x, rand_y, False)
+    time_taken = time.time() - init_time
+    print(lat_dg, lon_dg)
+    elevation = grand_canyon.get_elevation_from_latlon(lon_dg, lat_dg)
+    print("The elevation at " + str(rand_x) + " " + str(rand_y) + " is " + str(elevation))
+    # print("Time taken is " + str(time_taken))
+    time_list.append(time_taken)
+
+print("The average time taken is " + str(np.mean(time_list)))
+print("total time taken is " + str(np.sum(time_list)))    
+    
+
+# start_x = 0 
+# start_y = 0
+
+# actual_x = start_x - min_x
+# actual_y = start_y - min_y
+
+# print("The actual x is " + str(actual_x))
+# print("The actual y is " + str(actual_y))
+
+# if (actual_x, actual_y) in cartesian_hash:
+#     print("The elevation at " + str(actual_x) + " " + str(actual_y) + " is " + str(cartesian_hash[(actual_x, actual_y)]))
+# else:
+#     print("The elevation at " + str(actual_x) + " " + str(actual_y) + " is not in the map")
+    
+
+# with planner_x,planner_y int coordinate 
+# query elevation 
+# get planner x and y by the min x and y from the map
+# check if the planner x and y are in the map
+# if not, return the closest elevation
+
+# return elevation
 
 '''
 lgtf = Terrain(map_used = 'sullivan_indiana.tif', 
@@ -320,10 +528,10 @@ lgtf = Terrain(map_used = 'sullivan_indiana.tif',
 '''EXECUTION'''
 # grand_canyon.get_elevation( -112.5 , 36.3)
 # grand_canyon.print_map()
-# grand_canyon.print_whole_map()
+grand_canyon.print_whole_map()
 # grand_canyon.plot_3d_matlib()
-grand_canyon.plot_3d_expanded(3 , 0 , 16000)
-
+# grand_canyon.plot_3d_expanded(3 , 0 , 16000)
+    
 
 # lgtf.plot_3d_expanded(15 , 0 , 1600)
 # lgtf.print_map()

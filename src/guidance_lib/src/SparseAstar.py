@@ -430,8 +430,6 @@ class SparseAstar():
                                 radar_probs.append(radar_cost)
 
                         else:
-
-
                             #Need to fix voxel detections this is a hacky way to fix it
                             z_vals = [0, 1, -1, 2, -2]
                             y_vals = [0, 1, -1, 2, -2]
@@ -467,6 +465,7 @@ class SparseAstar():
                                 new_pos = PositionVector(next_x,
                                                             next_y,
                                                             neighbor.position.z)
+                                
                                 idx_pos = self.grid.convert_position_to_index(new_pos)
                                 if idx_pos in radar.detection_info:
                                     rcs_key = self.get_key(
