@@ -66,12 +66,7 @@ class Terrain():
         
         with rasterio.open(self.map_used) as src:
             self.src = src
-            print("bounds are " + str(src.bounds))
             self.elevations = src.read(1)
-            
-            #get size of index
-            print("len of index is" + str(len(self.elevations)))
-        # self.cartesian_elevations = self.get_cartesian_elevation_hash()
         
     def get_latlon_elevation_hash(self) -> dict:
         """
@@ -114,18 +109,17 @@ class Terrain():
 
         return latlon_hash
 
-    def get_elevation_from_latlon(self, lon_dg:float, lat_dg:float):
+    def get_elevation_from_latlon(self, lon_dg:float, lat_dg:float) -> float:
         """returns the elevation of a given lat lon point"""
-        # print("The lat lon is " + str(lat_dg) + " " + str(lon_dg))
-        
-        #truncate to 4 digits of precision
-        lat_dg = round(lat_dg, 4)
-        lon_dg = round(lon_dg, 4)
-        
+
         idx = self.src.index(lon_dg, lat_dg) 
-       
-        #check if the index is in the bounds of the map
-        #return self.src.xy(*idx), self.elevations[idx]
+        
+        #check if idx is in the bounds of the map
+        if idx[0] < 0 or idx[0] >= len(self.elevations) or \
+            idx[1] < 0 or idx[1] >= len(self.elevations[0]):
+            
+                return None       
+        
         return self.elevations[idx]
 
     def cartesian_from_latlon(self,
