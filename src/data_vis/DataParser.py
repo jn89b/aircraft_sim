@@ -1,0 +1,71 @@
+import pandas as pd
+
+from src.guidance_lib.src.Terrain import Terrain
+
+class DataHandler():
+    """
+    This is mostly a utility class to handle formatting of data
+    
+    """
+    
+    def __init__(self) -> None:
+        pass
+    
+    @staticmethod    
+    def return_planner_states(states:list) ->pd.DataFrame:
+        """
+        This function takes in a list of states and returns a dataframe
+        input: list of states from sparse astar
+        output: dataframe of states
+        where each state is a list of [x, y, z, theta_dg, phi_dg, psi_dg]
+        """
+        x = [state[0] for state in states]
+        y = [state[1] for state in states]
+        z = [state[2] for state in states]
+        theta_dg = [state[3] for state in states]
+        phi_dg = [state[4] for state in states]
+        psi_dg = [state[5] for state in states]
+
+        #return a dataframe
+        planner_states = pd.DataFrame({'x':x, 'y':y, 'z':z, 
+                                    'theta_dg':theta_dg, 
+                                    'phi_dg':phi_dg, 
+                                    'psi_dg':psi_dg})
+
+        return planner_states
+
+    
+    @staticmethod
+    def format_data_with_terrain(planner_states:pd.DataFrame,
+        terrain:Terrain) -> pd.DataFrame:
+        
+        """
+        This function takes in a dataframe of planner states and formats
+        the x and y positions to be in the same coordinate system as the
+        terrain map
+        input: planner_states dataframe
+        output: formatted dataframe
+        
+        """
+        x_formatted = []
+        y_formatted = []
+        z_formatted = []
+        
+        for i in range(len(planner_states)):
+            x = planner_states['x'][i]
+            y = planner_states['y'][i]
+            
+            x_pos = x/(terrain.max_x - terrain.min_x) * terrain.expanded_array.shape[0]
+            y_pos = y/(terrain.max_y - terrain.min_y) * terrain.expanded_array.shape[1]
+            
+            x_formatted.append(x_pos)
+            y_formatted.append(y_pos)
+            z_formatted.append(planner_states['z'][i])
+            
+        formatted_df = pd.DataFrame({'x':x_formatted, 'y':y_formatted,
+                                        'z':z_formatted})
+        
+        return formatted_df 
+    
+    
+    

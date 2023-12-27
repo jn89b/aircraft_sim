@@ -35,7 +35,7 @@ class FWAgent():
         self.max_climb_angle_dg = max_climb_angle_dg
         self.max_psi_turn_dg = max_psi_turn_dg
 
-
+    #this can be sped up 
     def get_moves(self, position:PositionVector, curr_psi_dg:float,
                   step_psi=5) -> list:
         """
@@ -45,6 +45,10 @@ class FWAgent():
         
         moves = []
         ac_max_psi_dg = self.max_psi_turn_dg
+
+        max_z = 20
+        min_z = -20
+        step_z = 5
 
         for i in range(0,ac_max_psi_dg+step_psi, step_psi):
             next_psi_dg = curr_psi_dg + i
@@ -56,7 +60,7 @@ class FWAgent():
             psi_rad = np.deg2rad(next_psi_dg)
             next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
             next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
-            for z in range(-1,2,1):
+            for z in range(min_z, max_z+step_z, step_z):
                 next_z = position.z + z
                 moves.append([next_x, next_y, next_z])
 
@@ -70,7 +74,7 @@ class FWAgent():
             psi_rad = np.deg2rad(next_psi_dg)
             next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
             next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
-            for z in range(-1,2,1):
+            for z in range(min_z, max_z+step_z, step_z):
                 next_z = position.z + z
                 moves.append([next_x, next_y, next_z])
         return moves

@@ -4,6 +4,7 @@ from queue import PriorityQueue
 
 from src.guidance_lib.src.PositionVector import PositionVector
 from src.guidance_lib.src.Grid import Grid
+from src.guidance_lib.src.Terrain import Terrain
 
 import time
 
@@ -13,7 +14,6 @@ def round_to_nearest_even(number:int):
         return rounded_number + 1  # If odd, add 1 to make it even
     else:
         return rounded_number  # If even, return it as is
-
 
 class Node(object):
     """
@@ -79,8 +79,6 @@ class Node(object):
     def __repr__(self):
         return ('({0},{1})'.format(self.position, self.f))
 
-
-
 class SparseAstar():
     def __init__(self, grid:Grid, 
                  velocity=5,
@@ -88,7 +86,10 @@ class SparseAstar():
                  rcs_hash:dict={}, 
                  radar_info:list=[],
                  radar_weight:float=0, 
-                 max_rcs:float=1) -> None:        
+                 max_rcs:float=1,
+                 use_terrain:bool=False,
+                 terrain_map:Terrain=None) -> None:
+                
         self.open_set = PriorityQueue()
         self.closed_set = {}
 
@@ -103,6 +104,9 @@ class SparseAstar():
         self.radar_weight = radar_weight
         self.rcs_hash = rcs_hash
         self.max_rcs = max_rcs
+        
+        self.use_terrain = use_terrain
+        self.terrain_map = terrain_map
 
     def clear_sets(self):
         self.open_set = PriorityQueue()
@@ -146,6 +150,16 @@ class SparseAstar():
         if self.grid.is_in_obstacle(position):
             return False
         
+        x = position.x
+        y = position.y
+        z = position.z
+        
+        if self.use_terrain:
+            lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(x, y)
+            elevation = self.terrain_map.get_elevation_from_latlon(lat_dg, lon_dg)
+            if z < elevation + 50:
+                return False
+            
         return True
         
     def get_legal_moves(self, current_node:Node, psi_dg:float)-> list:
@@ -186,7 +200,7 @@ class SparseAstar():
         return f"{azimith_dg}_{elevation_dg}"
 
 
-    def return_path(self,current_node):
+    def return_path(self,current_node) -> list:
         path = []
         current = current_node
         
@@ -328,7 +342,7 @@ class SparseAstar():
         return radar_cost, rcs_val
         
 
-    def search(self):
+    def search(self) -> list:
         
         max_iterations = 10000
         iterations = 0
@@ -356,6 +370,13 @@ class SparseAstar():
                 print("time", current_time)
                 print("found goal", current_node.position)
                 return self.return_path(current_node)
+            
+            #check if close to goal 
+            if self.compute_distance(current_node, self.goal_node) < self.agent.leg_m:
+                print("time", current_time)
+                print("found goal", current_node.position)
+                return self.return_path(current_node)
+            
             
             if iterations >= max_iterations:
                 print("iterations", iterations)
