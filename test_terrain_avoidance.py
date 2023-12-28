@@ -25,8 +25,11 @@ data_handler = DataHandler()
 # start_position = PositionVector(10, 60, 2000)
 # goal_position  = PositionVector(5000, 5000, 1500)
 
-start_position = PositionVector(0, 0, 2000)
-goal_position  = PositionVector(5000, 5000, 1500)
+# start_position = PositionVector(0, 0, 2000)
+# goal_position  = PositionVector(3500, 3500, 950)
+
+start_position = PositionVector(3750, 300, 1200)
+goal_position  = PositionVector(2000, 4800, 1300)
 
 
 fw_agent_psi_dg = 45
@@ -34,7 +37,7 @@ fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
 fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
                                 max_climb_angle_dg=5,
                                 max_psi_turn_dg=25)
-fw_agent.leg_m = 75
+fw_agent.leg_m = 25
 
 fw_agent.set_goal_state(goal_position)
 
@@ -68,7 +71,8 @@ print('goal elevation: ', goal_elevation)
                                                         
 
 sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
-                           use_terrain=True, velocity=15)
+                           use_terrain=True, velocity=15,
+                           terrain_buffer_m=10)
 
 sparse_astar.init_nodes()
 path = sparse_astar.search()
@@ -102,7 +106,6 @@ trajectory = go.Scatter3d(x=formatted_states['x'],
                             #   colorscale='Viridis',
                           ),
                           name='planner trajectory')
-
 
 #add on to figure
 fig.add_trace(trajectory)

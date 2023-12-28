@@ -88,7 +88,8 @@ class SparseAstar():
                  radar_weight:float=0, 
                  max_rcs:float=1,
                  use_terrain:bool=False,
-                 terrain_map:Terrain=None) -> None:
+                 terrain_map:Terrain=None,
+                 terrain_buffer_m:float=50) -> None:
                 
         self.open_set = PriorityQueue()
         self.closed_set = {}
@@ -107,6 +108,7 @@ class SparseAstar():
         
         self.use_terrain = use_terrain
         self.terrain_map = terrain_map
+        self.terrain_buffer_m = terrain_buffer_m
 
     def clear_sets(self):
         self.open_set = PriorityQueue()
@@ -150,14 +152,11 @@ class SparseAstar():
         if self.grid.is_in_obstacle(position):
             return False
         
-        x = position.x
-        y = position.y
-        z = position.z
-        
         if self.use_terrain:
-            lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(x, y)
+            lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(
+                position.x, position.y)
             elevation = self.terrain_map.get_elevation_from_latlon(lat_dg, lon_dg)
-            if z < elevation + 50:
+            if position.z < elevation + self.terrain_buffer_m:
                 return False
             
         return True
@@ -348,7 +347,7 @@ class SparseAstar():
         iterations = 0
         
         start_time = time.time()
-        max_time = 10 #seconds
+        max_time = 5 #seconds
 
         while (not self.open_set.empty() and iterations < max_iterations):
 
@@ -515,11 +514,15 @@ class SparseAstar():
                 
                     neighbor.rcs_value = rcs_val
                     neighbor.radar_detection = radar_cost
-                    neighbor.radar_cost = self.radar_weight*radar_cost                        
+                    neighbor.radar_cost = self.radar_weight*radar_cost
 
+                height_cost = 0
+                if current_node.position.z != neighbor.position.z:
+                    height_cost = 2
+                    
                 neighbor.g = current_node.g + 1
                 neighbor.h = (self.compute_distance(neighbor, self.goal_node))
-                neighbor.f = neighbor.g +  neighbor.h + neighbor.radar_cost
+                neighbor.f = neighbor.g +  neighbor.h + neighbor.radar_cost + height_cost
                 self.open_set.put((neighbor.f, neighbor))
 
         return self.return_path(current_node)
