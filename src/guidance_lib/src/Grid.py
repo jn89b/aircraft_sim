@@ -5,6 +5,26 @@ from src.guidance_lib.src.Obstacle import Obstacle
 
 
 class FWAgent():
+    
+    """
+    Represents an agent (e.g., aircraft) with position, orientation, and movement constraints.
+    
+    Attributes:
+        position (PositionVector): Current position of the agent.
+        theta_dg (float): Pitch angle in degrees.
+        psi_dg (float): Azimuth heading in degrees.
+        radius_m (float): Radius of the agent in meters.
+        leg_m (float): Leg length of the agent's path in meters.
+    
+    Methods:
+        __init__: Constructor to initialize the agent.
+        set_current_state: Updates the state of the agent.
+        set_goal_state: Sets a goal position for the agent.
+        vehicle_constraints: Sets the vehicle constraints.
+        get_moves: Calculates all possible forward moves based on current position and heading.
+    """
+    
+    
     def __init__(self, position:PositionVector, 
                  theta_dg:float=0, psi_dg:float=0, leg_m:float=50) -> None:
         self.position = position
@@ -82,9 +102,27 @@ class FWAgent():
 
 class Grid():
     """
-    Set grid size based on agent constraints
-    For now consider in units of meters 
+    Defines a grid-based environment for navigation by an FWAgent.
+
+    Attributes:
+        agent (FWAgent): The agent navigating the grid.
+        x_min_m, y_min_m, z_min_m (float): Minimum coordinates of the grid.
+        x_max_m, y_max_m, z_max_m (float): Maximum coordinates of the grid.
+        offset_x, offset_y, offset_z (float): Offsets for grid coordinates.
+        obstacles (list[Obstacle]): List of obstacles within the grid.
+
+    Methods:
+        __init__: Constructor to initialize the grid.
+        get_grid_size: Returns the size of the grid.
+        insert_obstacles: Adds an obstacle to the grid.
+        map_position_to_grid: Maps a position to the grid, adjusting based on direction.
+        set_grid_size: Sets the size of the grid based on agent constraints.
+        is_out_bounds: Checks if a position is out of the grid bounds.
+        is_in_obstacle: Checks if a position is within an obstacle.
+        convert_position_to_index: Converts a 3D position to a 1D index.
+        convert_index_to_position: Converts a 1D index back to a 3D position.
     """
+
     def __init__(self, 
                  agent:FWAgent, 
                  x_max_m:float=1000, 
