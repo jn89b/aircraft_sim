@@ -16,8 +16,6 @@ from src.guidance_lib.src.Obstacle import Obstacle
 from src.guidance_lib.src.SparseAstar import SparseAstar
 from src.config.Config import utm_param
 from src.data_vis.DataParser import DataHandler
-
-
 import random
 
 

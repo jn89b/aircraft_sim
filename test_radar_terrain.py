@@ -4,23 +4,28 @@ from src.guidance_lib.src.Obstacle import Obstacle
 from src.guidance_lib.src.Terrain import Terrain
 from src.config.Config import utm_param
 from src.guidance_lib.src.PositionVector import PositionVector
+from src.guidance_lib.src.SparseAstar import SparseAstar
+from src.guidance_lib.src.Config.radar_config import RADAR_AIRCRAFT_HASH_FILE
 
+import pandas as pd
 import numpy as np
 import time 
-
+import os
 import plotly.graph_objects as go
+from src.data_vis.DataParser import DataHandler
+
 #%%
 
 """
 A manual test to see if radar will detect obstacles and terrain
+
 """
+data_handle = DataHandler()
 start_position = PositionVector(0, 0, 2000)
-goal_position  = PositionVector(3500, 3500, 1200)
+goal_position  = PositionVector(1500, 1500, 1500)
 
 # start_position = PositionVector(3750, 300, 1200)
 # goal_position  = PositionVector(2000, 4800, 1300)
-
-
 
 grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                        lon_min = -112.5, 
@@ -29,6 +34,13 @@ grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif',
                        lat_max = 36.25,
                        utm_zone=utm_param['grand_canyon'])
 
+
+goal_lat, goal_lon = grand_canyon.latlon_from_cartesian(goal_position.x,
+                                                        goal_position.y)
+
+goal_elevation  = grand_canyon.get_elevation_from_latlon(goal_lat, goal_lon)
+
+print('goal elevation: ', goal_elevation)
 
 fw_agent_psi_dg = 45
 fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
@@ -88,10 +100,60 @@ detection_info_jit = radar1.compute_fov_cells_3d(obs_list, True,
 final_time = time.time() - init_time
 print("final time jit: ", final_time)
 # detection_info = radar1.compute_fov_cells_3d(obs_list, True,
+                   
+#%% 
+## load hash table for rcs, wrap this in a function
+pwd = os.getcwd()
+info_dir = 'info/hash/'
+save_dir = 'figures/' + RADAR_AIRCRAFT_HASH_FILE
+rcs_file = info_dir+ RADAR_AIRCRAFT_HASH_FILE + '.csv'
+df = pd.read_csv(rcs_file, header=None)
+#get first column
+rpy_keys = df.iloc[:, 0]
+rcs_vals = df.iloc[:, 1]
+max_rcs_val = min(rcs_vals)
+
+#convert to dictionary
+rcs_hash = dict(zip(rpy_keys, rcs_vals))
+
+                                    
+## load the planner
+radars = [radar1]
+sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
+                           use_terrain=True, velocity=15,
+                           terrain_buffer_m=10, 
+                           use_radar=True, radar_info=radars,
+                           rcs_hash=rcs_hash,
+                           radar_weight=100)
+sparse_astar.init_nodes()
+path = sparse_astar.search()
+planner_states = data_handle.return_planner_states(path)
+#save to csv
+planner_states.to_csv('planner_states.csv')
+formatted_states = data_handle.format_traj_data_with_terrain(planner_states, 
+                                                         grand_canyon)
+
+trajectory = go.Scatter3d(x=formatted_states['x'],
+                            y=formatted_states['y'], 
+                            z=planner_states['z'],
+                            line=dict(
+                                color='red',
+                                width=4
+                                ),
+                            marker=dict(
+                                color=planner_states['z'],
+                                colorscale='Viridis',
+                                size=3,
+                                opacity=0.1,
+                                colorbar=dict(
+                                    title='Range From Source Radar',
+                                    x=0)
+                                ),
+                            name='planner trajectory'
+                            )
                                     
 #%% 
-from src.data_vis.DataParser import DataHandler
-data_handle = DataHandler()
+
 detect_info = detection_info_jit.items()
 voxels = radar1.get_voxels(detect_info,100)
 voxels_normalized = data_handle.format_radar_data_with_terrain(voxels, grand_canyon)
@@ -105,6 +167,7 @@ z_pos = radar_pos.z
 
 fig.add_trace(go.Scatter3d(x=[x_pos], y=[y_pos], z=[z_pos], mode='markers', marker=dict(color='red', size=5)))
 fig.add_trace(voxel_visualizer)
+fig.add_trace(trajectory)
 
 #make another plot
 regular_voxels = go.Scatter3d(x=voxels['voxel_x'], y=voxels['voxel_y'], z=voxels['voxel_z'],
@@ -114,5 +177,6 @@ fig2 = go.Figure()
 fig2.add_trace(regular_voxels)
 fig2.add_trace(regular_position)
 
+
 fig.show()
-fig2.show()
+# fig2.show()

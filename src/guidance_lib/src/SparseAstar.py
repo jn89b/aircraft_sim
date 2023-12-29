@@ -519,7 +519,7 @@ class SparseAstar():
 
                 height_cost = 0
                 if current_node.position.z != neighbor.position.z:
-                    height_cost = 2
+                    height_cost = 0.1
                     
                 neighbor.g = current_node.g + 1
                 neighbor.h = (self.compute_distance(neighbor, self.goal_node))
