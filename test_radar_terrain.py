@@ -17,23 +17,29 @@ from src.data_vis.DataParser import DataHandler
 #%%
 
 """
-A manual test to see if radar will detect obstacles and terrain
-
+A manual test of the radar system with terrain avoidance using sparse A*
 """
 data_handle = DataHandler()
 start_position = PositionVector(0, 0, 2000)
-goal_position  = PositionVector(1500, 1500, 1500)
+goal_position  = PositionVector(1500, 1500, 1580)
 
 # start_position = PositionVector(3750, 300, 1200)
 # goal_position  = PositionVector(2000, 4800, 1300)
 
+# grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
+#                        lon_min = -112.5, 
+#                        lon_max = -112.45, 
+#                        lat_min = 36.2, 
+#                        lat_max = 36.25,
+#                        utm_zone=utm_param['grand_canyon'])
+
+
 grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                        lon_min = -112.5, 
-                       lon_max = -112.45, 
+                       lon_max = -112.48, 
                        lat_min = 36.2, 
-                       lat_max = 36.25,
+                       lat_max = 36.22,
                        utm_zone=utm_param['grand_canyon'])
-
 
 goal_lat, goal_lon = grand_canyon.latlon_from_cartesian(goal_position.x,
                                                         goal_position.y)
@@ -159,6 +165,14 @@ voxels = radar1.get_voxels(detect_info,100)
 voxels_normalized = data_handle.format_radar_data_with_terrain(voxels, grand_canyon)
 voxel_visualizer = radar1.get_visual_scatter_radar(voxels_normalized)
 fig = grand_canyon.plot_3d_expanded(1, 0 , 2200)
+
+#plot the goal position
+x_goal = goal_position.x/(grand_canyon.max_x - grand_canyon.min_x) * grand_canyon.expanded_array.shape[0]
+y_goal = goal_position.y/(grand_canyon.max_y - grand_canyon.min_y) * grand_canyon.expanded_array.shape[1]
+z_goal = goal_position.z
+
+fig.add_trace(go.Scatter3d(x=[x_goal], y=[y_goal], z=[z_goal], mode='markers', marker=dict(color='green', size=5)))
+
 
 #plot the original position
 x_pos = radar_pos.x/(grand_canyon.max_x - grand_canyon.min_x) * grand_canyon.expanded_array.shape[0]

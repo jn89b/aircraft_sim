@@ -201,6 +201,11 @@ class SparseAstar():
 
 
     def return_path(self,current_node) -> list:
+        """
+        returns the path from start to goal
+        in the form of a list of states
+        
+        """
         path = []
         current = current_node
         
@@ -211,6 +216,9 @@ class SparseAstar():
             states.append(current.psi_dg)
             states.append(current.rcs_value)
             states.append(current.radar_detection)
+            states.append(current.radar_cost)
+            states.append(current.total_distance)
+            states.append(current.total_time)
             path.append(states)
             current = current.parent
         # Return reversed path as we need to show from start to end path
@@ -344,11 +352,11 @@ class SparseAstar():
 
     def search(self) -> list:
         
-        max_iterations = 10000
+        max_iterations = 20000
         iterations = 0
         
         start_time = time.time()
-        max_time = 10 #seconds
+        max_time = 30 #seconds
 
         while (not self.open_set.empty() and iterations < max_iterations):
 
@@ -524,6 +532,8 @@ class SparseAstar():
                 neighbor.g = current_node.g + 1
                 neighbor.h = (self.compute_distance(neighbor, self.goal_node))
                 neighbor.f = neighbor.g +  neighbor.h + neighbor.radar_cost + height_cost
+                neighbor.total_distance = current_node.total_distance + self.compute_distance(neighbor, current_node)
+                neighbor.total_time = neighbor.total_distance / self.velocity
                 self.open_set.put((neighbor.f, neighbor))
 
         return self.return_path(current_node)
