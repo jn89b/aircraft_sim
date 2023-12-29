@@ -25,11 +25,19 @@ data_handler = DataHandler()
 # start_position = PositionVector(10, 60, 2000)
 # goal_position  = PositionVector(5000, 5000, 1500)
 
-# start_position = PositionVector(0, 0, 2000)
-# goal_position  = PositionVector(3500, 3500, 950)
+start_position = PositionVector(0, 0, 2000)
+goal_position  = PositionVector(3500, 3500, 1200)
 
-start_position = PositionVector(3750, 300, 1200)
-goal_position  = PositionVector(2000, 4800, 1300)
+# start_position = PositionVector(3750, 300, 1200)
+# goal_position  = PositionVector(2000, 4800, 1300)
+
+
+grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
+                       lon_min = -112.5, 
+                       lon_max = -112.45, 
+                       lat_min = 36.2, 
+                       lat_max = 36.25,
+                       utm_zone=utm_param['grand_canyon'])
 
 
 fw_agent_psi_dg = 45
@@ -42,26 +50,18 @@ fw_agent.leg_m = 25
 fw_agent.set_goal_state(goal_position)
 
 ## create grid
-x_max = 5000
-y_max = 6000
+x_max = int(grand_canyon.max_x - grand_canyon.min_x)
+y_max = int(grand_canyon.max_y - grand_canyon.min_y)
 z_max = 2100
 z_min = 1000
 
 grid = Grid(agent=fw_agent, x_max_m=x_max, y_max_m=y_max, 
             z_max_m=z_max, z_min_m=z_min)
 
-grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
-                       lon_min = -112.5, 
-                       lon_max = -112.45, 
-                       lat_min = 36.2, 
-                       lat_max = 36.25,
-                       utm_zone=utm_param['grand_canyon'])
-
-
-start_lat, start_lon = grand_canyon.latlon_from_cartesian(start_position.y, 
-                                                          start_position.x)
-goal_lat, goal_lon = grand_canyon.latlon_from_cartesian(goal_position.y,
-                                                        goal_position.x)
+start_lat, start_lon = grand_canyon.latlon_from_cartesian(start_position.x, 
+                                                          start_position.y)
+goal_lat, goal_lon = grand_canyon.latlon_from_cartesian(goal_position.x,
+                                                        goal_position.y)
 
 start_elevation = grand_canyon.get_elevation_from_latlon(start_lat,start_lon)
 goal_elevation  = grand_canyon.get_elevation_from_latlon(goal_lat, goal_lon)
@@ -69,7 +69,6 @@ goal_elevation  = grand_canyon.get_elevation_from_latlon(goal_lat, goal_lon)
 print('start elevation: ', start_elevation)
 print('goal elevation: ', goal_elevation)
                                                         
-
 sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
                            use_terrain=True, velocity=15,
                            terrain_buffer_m=10)
@@ -83,7 +82,7 @@ planner_states = data_handler.return_planner_states(path)
 #save to csv
 planner_states.to_csv('planner_states.csv')
 
-formatted_states = data_handler.format_data_with_terrain(planner_states, 
+formatted_states = data_handler.format_traj_data_with_terrain(planner_states, 
                                                          grand_canyon)
 
 #plot in 2D

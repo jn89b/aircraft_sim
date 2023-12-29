@@ -84,6 +84,7 @@ class Terrain():
             """
             Convert cartesian coordinates to lat lon coordinates in degrees
             """
+
             if include_bias ==  True:
                 x = x + self.min_x
                 y = y + self.min_y

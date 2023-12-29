@@ -274,6 +274,12 @@ def check_obstacles(obstacle_list:np.ndarray,
         
     return False
         
+@njit
+def dumb_function(yes:bool) -> bool:
+    if yes == True:
+        return True
+    else:
+        return False
 
 #%% Checking obstacle inside with no jit and jit
 obstacles = []
@@ -282,11 +288,7 @@ for i in range(N_obstacles):
     x = np.random.randint(500, 1000)
     y = np.random.randint(500, 1000)
     z = np.random.randint(500, 1000)
-    # if i == 0:
-    #     x = 10
-    #     y = 10
-    #     z = 10
-        
+
     radius = 2
     obstacles.append((x,y,z, radius))
     
@@ -294,6 +296,8 @@ obstacles.append((615,615,615, radius))
 
 typed_obstacle_list = typed.List(obstacles)
 current_position = np.array([10,15,30])
+
+dumb_function(True)
 
 # #no jit
 # start_time = time.time()
@@ -366,10 +370,10 @@ if PLOT == True:
     obs_df = pd.DataFrame(obstacles, columns=['x','y','z','radius'])
     
     fig.add_trace(go.Scatter3d(x=obs_df['x'], y=obs_df['y'], z=obs_df['z'],
-                                 mode='markers', marker=dict(size=obs_df['radius']*10)))    
+                                 mode='markers', marker=dict(size=obs_df['radius']*10)))
+    
     fig.show()
-    
-    
+ 
     
 #%% Regular radar method vs numba raytrace
 from numba import cuda
@@ -403,6 +407,10 @@ for i in range(len(azmith_bearing_dgs)):
         jit_list.append(bearing_rays)
 final_time = time.time() - init_time
 print("jit time:", final_time)
+
+#%% parallelize the for loop with jit
+@njit(parallel=True)
+
 
 #%%
 @cuda.jit

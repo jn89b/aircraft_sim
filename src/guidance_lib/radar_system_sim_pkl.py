@@ -133,6 +133,8 @@ if __name__ == '__main__':
 
     # Set radar params
     radar_pos = PositionVector(50, 0, 0)
+    
+    #elevation 90 is 
     radar_params = {
         'pos': radar_pos,
         'azimuth_angle_dg': 30,

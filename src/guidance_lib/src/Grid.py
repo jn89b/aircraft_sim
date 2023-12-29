@@ -66,9 +66,9 @@ class FWAgent():
         moves = []
         ac_max_psi_dg = self.max_psi_turn_dg
 
-        max_z = 20
-        min_z = -20
-        step_z = 5
+        max_z = 30
+        min_z = -30
+        step_z = 10
 
         for i in range(0,ac_max_psi_dg+step_psi, step_psi):
             next_psi_dg = curr_psi_dg + i

@@ -21,8 +21,8 @@ import plotly.graph_objects as go
 import pandas as pd
 import plotly.io as pio
 
-from src.Utils import measure_latlon_distance
-from src.config.Config import utm_param
+#from src.Utils import measure_latlon_distance
+# from src.config.Config import utm_param
 
 import pyproj
 from pyproj import Proj, transform, Transformer
@@ -67,6 +67,10 @@ class Terrain():
         with rasterio.open(self.map_used) as src:
             self.src = src
             self.elevations = src.read(1)
+            
+        z1 = self.generate_elevations()
+        z1 = np.array([row[::-1] for row in z1])
+        self.expanded_array = self.expand_array(z1, 1)
         
     def get_latlon_elevation_hash(self) -> dict:
         """
@@ -109,16 +113,21 @@ class Terrain():
 
         return latlon_hash
 
+    def test_elevation_from_latlon(self,lon_dg:float, lat_dg:float)-> float:
+        """
+        - split map into window location 
+        """
+    
     def get_elevation_from_latlon(self, lon_dg:float, lat_dg:float) -> float:
         """returns the elevation of a given lat lon point"""
 
         idx = self.src.index(lon_dg, lat_dg) 
         
-        #check if idx is in the bounds of the map
-        if idx[0] < 0 or idx[0] >= len(self.elevations) or \
-            idx[1] < 0 or idx[1] >= len(self.elevations[0]):
+        # #check if idx is in the bounds of the map
+        # if idx[0] < 0 or idx[0] >= len(self.elevations) or \
+        #     idx[1] < 0 or idx[1] >= len(self.elevations[0]):
             
-                return None       
+        #         return None       
         
         return self.elevations[idx]
 
@@ -287,12 +296,15 @@ class Terrain():
 
     def generate_elevations(self):
         with rasterio.open(self.map_used) as src:
-            window = src.window(
-                self.lon_min, self.lat_min, self.lon_max, self.lat_max)
-            area_of_intrest = src.read(1, window=window)
+            bounds = from_bounds(left=self.lon_min, bottom=self.lat_min,
+                                 right=self.lon_max, top=self.lat_max,
+                                 transform=src.transform)
+            
+            area_of_intrest = src.read(1, window=bounds)
         
-        x1 = np.arange(0, self.length_of_map(), 1)
-        y1 = np.arange(0, self.length_of_map(), 1)
+        map_length = self.length_of_map()
+        x1 = np.arange(0, map_length, 1)
+        y1 = np.arange(0, map_length, 1)
         x1, y1 = np.meshgrid(x1,y1)
         z1 = area_of_intrest[x1,y1]
         return z1
@@ -421,8 +433,7 @@ grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif',
                        lon_min = -112.5, 
                        lon_max = -112.45, 
                        lat_min = 36.2, 
-                       lat_max = 36.25,
-                       utm_zone=utm_param['grand_canyon'])
+                       lat_max = 36.25)
 
 
 # grand_canyon.print_information()
@@ -457,18 +468,32 @@ time_list = []
     
 # print("The average time taken is " + str(np.mean(time_list)))
 # print("total time taken is " + str(np.sum(time_list)))    
+
+expanded_array = grand_canyon.expanded_array
+
+for i in range(1000):
+    # rand_x = np.random.uniform(low=min_x, high=max_x)
+    # rand_y = np.random.uniform(low=min_y, high=max_y)
     
-for i in range(25):
-    rand_x = np.random.uniform(low=min_x, high=max_x)
-    rand_y = np.random.uniform(low=min_y, high=max_y)
+    rand_x = i
+    rand_y = i
     
     init_time = time.time()
-    lat_dg, lon_dg = grand_canyon.latlon_from_cartesian(rand_x, rand_y, False)
+    lat_dg, lon_dg = grand_canyon.latlon_from_cartesian(rand_x, rand_y, True)
     time_taken = time.time() - init_time
-    print(lat_dg, lon_dg)
+    #print(lat_dg, lon_dg)
     elevation = grand_canyon.get_elevation_from_latlon(lon_dg, lat_dg)
-    print("The elevation at " + str(rand_x) + " " + str(rand_y) + " is " + str(elevation))
-    # print("Time taken is " + str(time_taken))
+    elevation_test = grand_canyon.src.sample([(lat_dg, lon_dg)])
+    
+    rand_x = rand_x #- min_x
+    rand_y = rand_y #- min_y
+    row_idx = int((rand_x/(max_x - min_x)) * grand_canyon.expanded_array.shape[0])
+    col_idx = int((rand_y/(max_y - min_y)) * grand_canyon.expanded_array.shape[1])
+    print(row_idx, col_idx)
+
+    test_elevation = expanded_array[math.floor(row_idx), math.floor(col_idx)]
+    diff_elevation = elevation - test_elevation
+    print("diff elevation is " + str(diff_elevation))
     time_list.append(time_taken)
 
 print("The average time taken is " + str(np.mean(time_list)))

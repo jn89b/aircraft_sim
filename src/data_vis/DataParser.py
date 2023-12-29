@@ -36,7 +36,7 @@ class DataHandler():
 
     
     @staticmethod
-    def format_data_with_terrain(planner_states:pd.DataFrame,
+    def format_traj_data_with_terrain(planner_states:pd.DataFrame,
         terrain:Terrain) -> pd.DataFrame:
         
         """
@@ -66,6 +66,38 @@ class DataHandler():
                                         'z':z_formatted})
         
         return formatted_df 
+    
+    #can probably optimize with jit
+    @staticmethod
+    def format_radar_data_with_terrain(radar_voxels:dict, terrain:Terrain) -> dict:
+        """
+        This function takes in a dictionary of radar voxels and formats
+        the x and y positions to be in the same coordinate system as the
+        terrain map
+        input: radar_voxels dictionary
+        output: formatted dictionary
+        
+        """
+        x_formatted = []
+        y_formatted = []
+        z_formatted = []
+        
+        for i in range(len(radar_voxels['voxel_x'])):
+            x = radar_voxels['voxel_x'][i]
+            y = radar_voxels['voxel_y'][i]
+            
+            x_pos = x/(terrain.max_x - terrain.min_x) * terrain.expanded_array.shape[0]
+            y_pos = y/(terrain.max_y - terrain.min_y) * terrain.expanded_array.shape[1]
+            
+            x_formatted.append(x_pos)
+            y_formatted.append(y_pos)
+            z_formatted.append(radar_voxels['voxel_z'][i])
+            
+        formatted_dict = {'voxel_x':x_formatted, 'voxel_y':y_formatted,
+                                        'voxel_z':z_formatted,
+                                        'voxel_vals':radar_voxels['voxel_vals']}
+        
+        return formatted_dict
     
     
     

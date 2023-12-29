@@ -147,10 +147,6 @@ class SparseAstar():
 
     def is_valid_position(self, position:PositionVector) -> bool:
         """Checks if position is valid based on grid constraints"""
-        if self.grid.is_out_bounds(position):
-            return False
-        if self.grid.is_in_obstacle(position):
-            return False
         
         if self.use_terrain:
             lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(
@@ -158,7 +154,12 @@ class SparseAstar():
             elevation = self.terrain_map.get_elevation_from_latlon(lat_dg, lon_dg)
             if position.z < elevation + self.terrain_buffer_m:
                 return False
-            
+        
+        if self.grid.is_out_bounds(position):
+            return False
+        if self.grid.is_in_obstacle(position):
+            return False
+        
         return True
         
     def get_legal_moves(self, current_node:Node, psi_dg:float)-> list:
@@ -347,7 +348,7 @@ class SparseAstar():
         iterations = 0
         
         start_time = time.time()
-        max_time = 5 #seconds
+        max_time = 10 #seconds
 
         while (not self.open_set.empty() and iterations < max_iterations):
 

@@ -6,8 +6,10 @@ from src.guidance_lib.src.PositionVector import PositionVector, rotation_z, \
 
 from src.guidance_lib.src.Config.radar_config import radar_inputs
 from src.guidance_lib.src.Raytrace import fast_voxel_algo, \
-    fast_voxel_algo3D, another_fast_voxel
+    fast_voxel_algo3D, another_fast_voxel, another_fast_voxel_jit
 
+from numba import typed
+import plotly.graph_objects as go
 
 class Radar():
     def __init__(self, 
@@ -79,7 +81,7 @@ class Radar():
         """returns obstacles within fov"""
         return []
     
-    def compute_fov_cells_2d(self, obs_list=[]) -> list:
+    def compute_fov_cells_2d(self, obs_list:list=[], use_jit:bool=False) -> list:
         """
         returns the cells that are within the radar fov
         in 2d scale
@@ -110,13 +112,30 @@ class Radar():
 
         return detection_voxels
 
-    def compute_fov_cells_3d(self, obs_list=[]) -> list:
+    def compute_fov_cells_3d(self, obs_list:list, 
+                             use_jit:bool=False, 
+                             use_terrain:bool=False,
+                             terrain:np.ndarray=[],
+                             x_bounds:np.ndarray=[],
+                             y_bounds:np.ndarray=[],
+                             cell_rays:np.ndarray=np.empty((1000,3))) -> list:
         """returns """
         lat_fov_upp_dg = np.rad2deg(self.lat_fov_upp_rad)
         lat_fov_low_dg = np.rad2deg(self.lat_fov_low_rad)
 
         vert_fov_upp_dg = np.rad2deg(self.vert_fov_upp_rad)
         vert_fov_low_dg = np.rad2deg(self.vert_fov_low_rad)
+        
+        if use_terrain == True:
+            obstacles = []
+            for obs in obs_list:
+                x = obs.position.x
+                y = obs.position.y
+                z = obs.position.z
+                radius = obs.radius_m
+                obstacles.append((x,y,z,radius))
+
+            obstacles_jit = typed.List(obstacles)
 
         if lat_fov_low_dg > lat_fov_upp_dg:
             max_lat_dg = lat_fov_low_dg
@@ -152,9 +171,18 @@ class Radar():
                 r_max_y = round(r_max_y)
                 r_max_z = round(r_max_z)
                 
-                bearing_rays = another_fast_voxel(self.pos.x , self.pos.y, self.pos.z,
-                                            r_max_x, r_max_y, r_max_z, obs_list)
+                if use_jit == True:
+                    # print("obstacles_jit", obstacles_jit)
+                    bearing_rays = another_fast_voxel_jit(
+                        self.pos.x , self.pos.y, self.pos.z,
+                        r_max_x, r_max_y, r_max_z, obstacles_jit,
+                        use_terrain, terrain, x_bounds, y_bounds,
+                        cell_rays)
                 
+                else:
+                    bearing_rays = another_fast_voxel(self.pos.x , self.pos.y, self.pos.z,
+                                            r_max_x, r_max_y, r_max_z, obs_list)
+                    
                 for br in bearing_rays:
                     pos = PositionVector(int(br[0]), int(br[1]), int(br[2]))
                     pos_idx = self.grid.convert_position_to_index(pos)
@@ -196,6 +224,81 @@ class Radar():
         probability_detection = 1- pow(radar_prob_detection , self.radar_fq_hz)
 
         return probability_detection
+
+    def get_voxels(self, detection_info:tuple, vox_step:int=100) -> list:
+        """
+        Pig: 
+        Inputs: take in detection_info item 
+
+        Processing is the implementation/ how do we make the sausage
+        
+        Sausage: 
+        returns: radar information which is a dictionary that has 
+        the following information
+            x values
+            y values 
+            z values
+            voxel_values 
+        """
+        radar_info = {
+            'voxel_x': None,
+            'voxel_y': None,
+            'voxel_z': None,
+            'voxel_vals': None
+        }
+
+        voxels = []
+        voxel_vals = []
+        for k,v in detection_info:
+            pos = v[1]
+            voxels.append([pos.x, pos.y, pos.z])
+            voxel_vals.append(v[0])
+
+        voxel_x = []
+        voxel_y = []
+        voxel_z = []
+        for i, voxel in enumerate(voxels):
+            if i % vox_step == 0:
+                voxel_x.append(voxel[0])
+                voxel_y.append(voxel[1])
+                voxel_z.append(voxel[2])
+
+        radar_info['voxel_x'] = voxel_x
+        radar_info['voxel_y'] = voxel_y
+        radar_info['voxel_z'] = voxel_z
+        radar_info['voxel_vals'] = voxel_vals
+
+
+        return radar_info
+
+    def get_visual_scatter_radar(self, radar_info:dict):
+        """
+        Pig:
+        radar info x, y, z, vals
+
+        Implementation:
+        voxel_data = go.scatter
+        
+        Sausage:
+        The scatter
+        """
+        voxel_visualizer = go.Scatter3d(
+        x=radar_info['voxel_x'],
+        y=radar_info['voxel_y'],
+        z=radar_info['voxel_z'],
+        mode='markers',
+        name='voxel_data',
+        marker=dict(
+            color=radar_info['voxel_vals'],
+            colorscale='Viridis',
+            # color_discrete_sequence=px.colors.qualitative.Plotly,
+            size=3,
+            opacity=0.1
+            )
+        )
+
+        return voxel_visualizer
+
 
 if __name__ == "__main__":
     pass
