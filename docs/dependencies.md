@@ -9,3 +9,5 @@
 - pip3 install geopandas
 - pip3 install richdem
 - pip3 install pyproj
+- cuda version >= 11.2
+- 
