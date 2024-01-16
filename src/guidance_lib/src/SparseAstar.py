@@ -362,9 +362,7 @@ class SparseAstar():
 
             iterations += 1
             cost,current_node = self.open_set.get()
-            # print("current node", current_node.position.vec)
-            # print("current node psi", current_node.psi_dg)
-                
+                           
             self.closed_set[str(list(current_node.position.vec))] = current_node
 
             current_time = time.time() - start_time

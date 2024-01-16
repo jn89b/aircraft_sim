@@ -98,6 +98,3 @@ class DataHandler():
                                         'voxel_vals':radar_voxels['voxel_vals']}
         
         return formatted_dict
-    
-    
-    

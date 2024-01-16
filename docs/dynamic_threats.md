@@ -1,5 +1,4 @@
 # Dynamic Threats
-
 - These threats aren't very smart they just have a sentry pattern movement
 - Define the following for threats:
   - location
@@ -7,3 +6,4 @@
   - trajectory modeled as a b-spline
   - threat radar capabilities
   
+
