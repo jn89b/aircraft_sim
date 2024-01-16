@@ -29,6 +29,7 @@ Need to consider yaw angle of approach too
 
 import numpy as np
 import pandas as pd
+import multiprocessing
 
 from src.guidance_lib.src.PositionVector import PositionVector
 from src.data_vis.DataParser import DataHandler
@@ -287,6 +288,9 @@ def create_cylinder(center, height, radius):
     
 if __name__ == '__main__':
     
+    n_cpus = multiprocessing.cpu_count()
+    print("Number of available cpus: ", n_cpus)
+    
     goal_position  = PositionVector(1500, 1500, 1550)
 
     grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
@@ -449,6 +453,3 @@ if __name__ == '__main__':
     
     fig2.add_trace(aproach_vector_plot)
     fig2.show() 
-    
-    
-    
