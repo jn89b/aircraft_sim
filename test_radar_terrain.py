@@ -16,6 +16,30 @@ from src.data_vis.DataParser import DataHandler
 
 from concurrent.futures import ThreadPoolExecutor
 
+
+def run_different_goals(goalPostiion:PositionVector):
+    # Initialize SparseAstar
+    sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
+                               use_terrain=True, velocity=15,
+                               terrain_buffer_m=60, 
+                               use_radar=True, radar_info=radars,
+                               rcs_hash=rcs_hash,
+                               radar_weight=100)
+
+    # Initialize nodes
+    sparse_astar.init_nodes()
+
+    # Perform the search
+    path = sparse_astar.search(use_diff_goal=True, 
+                               goal_position=goalPostiion)
+
+    #print when done
+    print('done')
+
+    # Optionally, you can return the path or handle it here
+    return path
+    
+
 def run_sparse_astar(radar_heuristic_weight=100):
     # Initialize SparseAstar
     sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
@@ -177,21 +201,16 @@ radars = [radar1, radar2]
 
 num_worker = 4
 weights = [0, 0.1, 0.5, 1]
+
+goal_1 = PositionVector(1500, 1500, 1580)
+goal_2 = PositionVector(2500, 2500, 1600)
+goal_list = [goal_1, goal_2]
 # Create a ThreadPoolExecutor
 paths = []
 with ThreadPoolExecutor(max_workers=2) as executor:
     # Start two threads and get the future objects
-    # future1 = executor.submit(run_sparse_astar, 50)
-    # future2 = executor.submit(run_sparse_astar, 0)
-
-    # # Get the results (paths) from the futures
-    # path1 = future1.result()
-    # path2 = future2.result()
-        
-    #convert to for looops 
-    for i in range(len(weights)):
-        paths.append(executor.submit(run_sparse_astar, i*100))
-    
+    for i in range(len(goal_list)):
+        paths.append(executor.submit(run_different_goals, goal_list[i]))
 
 scatter_list = []
 #make a color list based on the number of paths

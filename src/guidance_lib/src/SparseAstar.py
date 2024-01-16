@@ -350,8 +350,15 @@ class SparseAstar():
         return radar_cost, rcs_val
         
 
-    def search(self) -> list:
+    def search(self, use_diff_goal:bool = False, 
+               goal_position:PositionVector = None) -> list:
         
+        if use_diff_goal == True:
+            self.goal_node = Node(None, goal_position,
+                                    self.velocity, 0,
+                                    self.agent.theta_dg, self.agent.psi_dg)
+            self.goal_node.g = self.goal_node.h = self.goal_node.f = 0
+            
         max_iterations = 20000
         iterations = 0
         

@@ -250,7 +250,7 @@ class ApproachGoal():
                     # self.detection_info[pos] = (p_density, pos)
                     sum_power_density += p_density
                     position_density_vals.append((p_density, pos))
-                    positions.append((pos.x, pos.y, pos.z))
+                    positions.append((pos.x, pos.y, pos.z, p_density))
 
                 self.detection_priority.push(positions, sum_power_density)
 
@@ -270,16 +270,20 @@ class ApproachGoal():
     def get_best_approaches(self, num_approaches:int=5) -> list:
         """returns the n best approaches to the goal location """
         best_approaches = []
-
+        
+        #reverse list of best approaches
         for i in range(num_approaches+1):
             best_approaches.append(self.detection_priority.pop_max())
-
+            
+        for i in range(len(best_approaches)):
+            best_approaches[i] = best_approaches[i][::-1]
+    
         return best_approaches
     
 # Function to generate cylinder data
-def create_cylinder(center, height, radius):
+def create_cylinder(center, height, radius, base_height=1500):
     x0, y0 = center
-    z = np.linspace(0, height, 50)
+    z = np.linspace(base_height, height, 50)
     theta = np.linspace(0, 2*np.pi, 50)
     theta_grid, z_grid = np.meshgrid(theta, z)
     x_grid = radius * np.cos(theta_grid) + x0
@@ -289,10 +293,11 @@ def create_cylinder(center, height, radius):
 if __name__ == '__main__':
     
     n_cpus = multiprocessing.cpu_count()
-    print("Number of available cpus: ", n_cpus)
+    n_cpus = n_cpus - 10
+    if n_cpus < 1:
+        n_cpus = 1
     
     goal_position  = PositionVector(1500, 1500, 1550)
-
     grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                         lon_min = -112.5, 
                         lon_max = -112.45, 
@@ -330,23 +335,34 @@ if __name__ == '__main__':
     detection_info,detection_priority = ag.get_possible_approaches(
         required_sum_power_density, obs_list)
     
-    best_approaches = ag.get_best_approaches(5)
-
+    best_approaches = ag.get_best_approaches(int(n_cpus))
+    
     highest_value_waypoint = detection_priority.pop_max()
-    print("highest value waypoint: ", highest_value_waypoint)
-
+    
     x_vals = []
     y_vals = []
     z_vals = []
     p_dense_vals = []
-    for detec in detection_info:
-        for vals in detec[1]:
-            p_dense = vals[0]
-            pos = vals[1]
-            x_vals.append(pos.x)
-            y_vals.append(pos.y)
-            z_vals.append(pos.z)
-            p_dense_vals.append(p_dense)
+
+    for path in best_approaches:
+        for wp in path:
+        # for vals in detec[1]:
+        #     p_dense = vals[0]
+        #     pos = vals[1]
+            x_vals.append(wp[0])
+            y_vals.append(wp[1])
+            z_vals.append(wp[2])
+            p_dense_vals.append(wp[3])
+
+    # for detec in detection_info:
+    #     for vals in detec[1]:
+    #         p_dense = vals[0]
+    #         pos = vals[1]
+    #         x_vals.append(pos.x)
+    #         y_vals.append(pos.y)
+    #         z_vals.append(pos.z)
+    #         p_dense_vals.append(p_dense)
+            
     
     data_handler = DataHandler()
     info_dictionary = {'x': x_vals, 'y': y_vals, 'z': z_vals, 'p_dense': p_dense_vals}
