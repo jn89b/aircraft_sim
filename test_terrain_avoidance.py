@@ -80,7 +80,7 @@ planner_states = data_handler.return_planner_states(path)
 #save to csv
 planner_states.to_csv('planner_states.csv')
 
-formatted_states = data_handler.format_traj_data_with_terrain(planner_states, 
+formatted_states = data_handler.scale_cartesian_with_terrain(planner_states, 
                                                          grand_canyon)
 
 #plot in 2D

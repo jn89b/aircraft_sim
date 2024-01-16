@@ -143,14 +143,14 @@ radar_params = {
 }
 
 radar1 = Radar(radar_params)
-
 radar2 = Radar(radar_params)
-# obs_list = []
 
 #detection with jit
 init_time = time.time()
-detection_info_jit = radar1.compute_fov_cells_3d(obs_list, True,
-                                             True, grand_canyon.expanded_array,
+detection_info_jit = radar1.compute_fov_cells_3d(obs_list, 
+                                             True,
+                                             True, 
+                                             grand_canyon.expanded_array,
                                              np.array([grand_canyon.min_x, grand_canyon.max_x]),
                                              np.array([grand_canyon.min_y, grand_canyon.max_y]))
 final_time = time.time() - init_time
@@ -208,7 +208,7 @@ scatter_list = []
 color_list = ['red', 'blue', 'green', 'orange', 'purple', 'yellow']
 for i, p in enumerate(paths):
     result = data_handle.return_planner_states(p.result())
-    planner_state = data_handle.format_traj_data_with_terrain(result, grand_canyon)
+    planner_state = data_handle.scale_cartesian_with_terrain(result, grand_canyon)
     scatter_list.append(go.Scatter3d(x=planner_state['x'],
                             y=planner_state['y'], 
                             z=planner_state['z'],

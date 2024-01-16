@@ -357,7 +357,7 @@ class DataVisualization():
             ani.save('global_animation.gif', writer='imagemagick', fps=30)
         
         return ani
-
+    
         
 
 

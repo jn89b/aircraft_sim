@@ -198,7 +198,7 @@ scatter_list = []
 color_list = ['red', 'blue', 'green', 'orange', 'purple', 'yellow']
 for i, p in enumerate(paths):
     result = data_handle.return_planner_states(p.result())
-    planner_state = data_handle.format_traj_data_with_terrain(result, grand_canyon)
+    planner_state = data_handle.scale_cartesian_with_terrain(result, grand_canyon)
     scatter_list.append(go.Scatter3d(x=planner_state['x'],
                             y=planner_state['y'], 
                             z=planner_state['z'],

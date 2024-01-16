@@ -28,12 +28,15 @@ Need to consider yaw angle of approach too
 """
 
 import numpy as np
+import pandas as pd
 
 from src.guidance_lib.src.PositionVector import PositionVector
-
+from src.data_vis.DataParser import DataHandler
 from src.guidance_lib.src.Raytrace import fast_voxel_algo,  another_fast_voxel
 from src.guidance_lib.src.Obstacle import Obstacle
 from src.guidance_lib.src.MaxPriorityQueue import MaxPriorityQueue
+from src.guidance_lib.src.Terrain import Terrain
+from src.config.Config import utm_param
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -41,9 +44,11 @@ import plotly.express as px
 
 class ApproachGoal():
     def __init__(self, 
-                 goal_params:dict) -> None:
+                 goal_params:dict,
+                 use_terrain:bool=False,
+                 terrain_buffer_m:float=0.0,
+                 terrain_map=None) -> None:
         
-
         self.pos = goal_params['pos']
         self.azmith_angle_dg = goal_params['azimuth_angle_dg']
         self.elevation_angle_dg = goal_params['elevation_angle_dg']
@@ -69,7 +74,14 @@ class ApproachGoal():
 
         self.detection_info = {}
 
+        #custom priority queue where the sum of the power density is the priority,
+        #and the position waypoints are the values
         self.detection_priority = MaxPriorityQueue()
+
+        self.use_terrain = use_terrain
+        self.terrain_map = terrain_map
+        
+        self.terrain_buffer_m = terrain_buffer_m 
 
     def compute_lat_max_fov(self):
         """computes the lateral bounds of the radar fov"""
@@ -138,7 +150,6 @@ class ApproachGoal():
                        r_max_x, r_max_y, r_max_z, obs_list)
             
             # if use_jit == True:
-            
             #     # print("obstacles_jit", obstacles_jit)
             #     bearing_rays = another_fast_voxel_jit(
             #         self.pos.x , self.pos.y, self.pos.z,
@@ -201,6 +212,21 @@ class ApproachGoal():
                 bearing_rays = another_fast_voxel(self.pos.x , self.pos.y, self.pos.z,
                                             r_max_x, r_max_y, r_max_z, obs_list)
                 
+                #check if terrain is being used
+                if self.use_terrain == True:
+                    filtered_rays = []
+                    for ray in bearing_rays:
+                        lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(
+                            ray[0], ray[1])
+                        elevation = self.terrain_map.get_elevation_from_latlon(
+                            lat_dg, lon_dg)
+                        if ray[2] > elevation + self.terrain_buffer_m:
+                            filtered_rays.append(ray)
+                        else:
+                            bearing_rays = filtered_rays
+                            break
+                    bearing_rays = filtered_rays
+
                 start_ray_pos = PositionVector(int(bearing_rays[0][0]),
                                                int(bearing_rays[0][1]),
                                                int(bearing_rays[0][2]))
@@ -240,7 +266,6 @@ class ApproachGoal():
         """computes the power density and returns the value"""
         return self.effector_power / (target_distance * 4*np.pi)
     
-
     def get_best_approaches(self, num_approaches:int=5) -> list:
         """returns the n best approaches to the goal location """
         best_approaches = []
@@ -261,7 +286,17 @@ def create_cylinder(center, height, radius):
     return x_grid, y_grid, z_grid
     
 if __name__ == '__main__':
-    origin_pos = PositionVector(10 , 10 ,10)
+    
+    goal_position  = PositionVector(1500, 1500, 1550)
+
+    grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
+                        lon_min = -112.5, 
+                        lon_max = -112.45, 
+                        lat_min = 36.2, 
+                        lat_max = 36.25,
+                        utm_zone=utm_param['grand_canyon'])
+    
+    origin_pos = goal_position
     goal_params = {
         'pos': origin_pos,
         'azimuth_angle_dg': 45,
@@ -277,22 +312,20 @@ if __name__ == '__main__':
 
     required_sum_power_density = 1.0
     
-    obs_positions = [(45, 45, 10),
-                     (25, 65, 10),
-                     (55, 30, 10)]
+    obs_positions = [(1540, 1540, 1580),
+                     (1530, 1530, 1580)]
     
     obs_list = []
     for pos in obs_positions:
         obs_position = PositionVector(pos[0], pos[1], pos[2])
-        radius_obs_m = 1
+        radius_obs_m = 2
         some_obstacle = Obstacle(obs_position, radius_obs_m)
         obs_list.append(some_obstacle)
 
-    ag = ApproachGoal(goal_params)
-    detection_info,detection_priority = ag.get_possible_approaches(required_sum_power_density, 
-                                                obs_list)
+    ag = ApproachGoal(goal_params, use_terrain=True, terrain_map=grand_canyon)
+    detection_info,detection_priority = ag.get_possible_approaches(
+        required_sum_power_density, obs_list)
     
-
     best_approaches = ag.get_best_approaches(5)
 
     highest_value_waypoint = detection_priority.pop_max()
@@ -310,8 +343,12 @@ if __name__ == '__main__':
             y_vals.append(pos.y)
             z_vals.append(pos.z)
             p_dense_vals.append(p_dense)
-
-        
+    
+    data_handler = DataHandler()
+    info_dictionary = {'x': x_vals, 'y': y_vals, 'z': z_vals, 'p_dense': p_dense_vals}
+    formatted_df = pd.DataFrame(info_dictionary)
+    formatted_df = data_handler.scale_cartesian_with_terrain(formatted_df, grand_canyon)
+    
     voxel_data = go.Scatter3d(
         x=x_vals,
         y=y_vals,
@@ -378,7 +415,6 @@ if __name__ == '__main__':
         x, y, z = create_cylinder((pos[0], pos[1]), pos[2], radius_obs_m)
         fig.add_surface(x=x, y=y, z=z, opacity=0.6)
 
-
     fig.show()
 
     #set top level view 
@@ -389,3 +425,30 @@ if __name__ == '__main__':
     fig.write_html("effector_obs.html")
     #save as png
     fig.write_image("effector_obs.png")
+
+    ##### Plot with Terrain #############
+    fig2 = grand_canyon.plot_3d_expanded(1, 0 , 2000)
+    
+    aproach_vector_plot = go.Scatter3d(
+        x=formatted_df['x'],
+        y=formatted_df['y'],
+        z=formatted_df['z'],
+        mode='markers',
+        name='voxel_data',
+        marker=dict(
+            color=p_dense_vals,
+            colorscale='Viridis',
+            # color_discrete_sequence=px.colors.qualitative.Plotly,
+            size=3,
+            opacity=0.1,
+            colorbar=dict(
+                title='Power Density',
+                x=0)
+        )
+    )
+    
+    fig2.add_trace(aproach_vector_plot)
+    fig2.show() 
+    
+    
+    

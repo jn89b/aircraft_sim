@@ -36,7 +36,7 @@ class DataHandler():
 
     
     @staticmethod
-    def format_traj_data_with_terrain(planner_states:pd.DataFrame,
+    def scale_cartesian_with_terrain(cartesian_states:pd.DataFrame,
         terrain:Terrain) -> pd.DataFrame:
         
         """
@@ -51,16 +51,16 @@ class DataHandler():
         y_formatted = []
         z_formatted = []
         
-        for i in range(len(planner_states)):
-            x = planner_states['x'][i]
-            y = planner_states['y'][i]
+        for i in range(len(cartesian_states)):
+            x = cartesian_states['x'][i]
+            y = cartesian_states['y'][i]
             
             x_pos = x/(terrain.max_x - terrain.min_x) * terrain.expanded_array.shape[0]
             y_pos = y/(terrain.max_y - terrain.min_y) * terrain.expanded_array.shape[1]
             
             x_formatted.append(x_pos)
             y_formatted.append(y_pos)
-            z_formatted.append(planner_states['z'][i])
+            z_formatted.append(cartesian_states['z'][i])
             
         formatted_df = pd.DataFrame({'x':x_formatted, 'y':y_formatted,
                                         'z':z_formatted})
