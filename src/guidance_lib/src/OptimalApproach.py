@@ -27,21 +27,27 @@ From goal location:
 """
 
 import numpy as np
-from src.PositionVector import PositionVector
+from src.guidance_lib.src.PositionVector import PositionVector
+from src.guidance_lib.src.Raytrace import fast_voxel_algo,  another_fast_voxel
+from src.guidance_lib.src.Obstacle import Obstacle
+from src.guidance_lib.src.MaxPriorityQueue import MaxPriorityQueue
 
-from src.Raytrace import fast_voxel_algo,  another_fast_voxel
-from src.Obstacle import Obstacle
-from src.MaxPriorityQueue import MaxPriorityQueue
+#from src.PositionVector import PositionVector
+
+# from src.Raytrace import fast_voxel_algo,  another_fast_voxel
+# from src.Obstacle import Obstacle
+# from src.MaxPriorityQueue import MaxPriorityQueue
 
 # import plotly.graph_objects as go
 # import plotly.express as px
 
-
-class ApproachGoalVector():
+class OptimalApproach():
     def __init__(self, 
-                 goal_params:dict) -> None:
+                 goal_params:dict,
+                 use_terrain:bool=False,
+                 terrain_buffer_m:float=0.0,
+                 terrain_map=None) -> None:
         
-
         self.pos = goal_params['pos']
         self.azmith_angle_dg = goal_params['azimuth_angle_dg']
         self.elevation_angle_dg = goal_params['elevation_angle_dg']
@@ -67,7 +73,14 @@ class ApproachGoalVector():
 
         self.detection_info = {}
 
+        #custom priority queue where the sum of the power density is the priority,
+        #and the position waypoints are the values
         self.detection_priority = MaxPriorityQueue()
+
+        self.use_terrain = use_terrain
+        self.terrain_map = terrain_map
+        
+        self.terrain_buffer_m = terrain_buffer_m 
 
     def compute_lat_max_fov(self):
         """computes the lateral bounds of the radar fov"""
@@ -128,8 +141,25 @@ class ApproachGoalVector():
 
             r_max_x = self.pos.x + self.max_effect_range_m*np.cos(np.deg2rad(bearing))
             r_max_y = self.pos.y + self.max_effect_range_m*np.sin(np.deg2rad(bearing))
-            bearing_rays = fast_voxel_algo(self.pos.x , self.pos.y, 
-                                        r_max_x, r_max_y, obs_list)
+            
+            # bearing_rays = fast_voxel_algo(self.pos.x , self.pos.y, 
+            #                             r_max_x, r_max_y, obs_list)
+            
+            bearing_rays = another_fast_voxel(self.pos.x, self.pos.y, self.pos.z, 
+                       r_max_x, r_max_y, r_max_z, obs_list)
+            
+            # if use_jit == True:
+            #     # print("obstacles_jit", obstacles_jit)
+            #     bearing_rays = another_fast_voxel_jit(
+            #         self.pos.x , self.pos.y, self.pos.z,
+            #         r_max_x, r_max_y, r_max_z, obstacles_jit,
+            #         use_terrain, terrain, x_bounds, y_bounds,
+            #         cell_rays)
+            
+            # else:
+            #     bearing_rays = another_fast_voxel(self.pos.x , self.pos.y, self.pos.z,
+            #                             r_max_x, r_max_y, r_max_z, obs_list)
+                
             detection_voxels.extend(bearing_rays)
 
         return detection_voxels
@@ -181,6 +211,21 @@ class ApproachGoalVector():
                 bearing_rays = another_fast_voxel(self.pos.x , self.pos.y, self.pos.z,
                                             r_max_x, r_max_y, r_max_z, obs_list)
                 
+                #check if terrain is being used
+                if self.use_terrain == True:
+                    filtered_rays = []
+                    for ray in bearing_rays:
+                        lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(
+                            ray[0], ray[1])
+                        elevation = self.terrain_map.get_elevation_from_latlon(
+                            lat_dg, lon_dg)
+                        if ray[2] > elevation + self.terrain_buffer_m:
+                            filtered_rays.append(ray)
+                        else:
+                            bearing_rays = filtered_rays
+                            break
+                    bearing_rays = filtered_rays
+
                 start_ray_pos = PositionVector(int(bearing_rays[0][0]),
                                                int(bearing_rays[0][1]),
                                                int(bearing_rays[0][2]))
@@ -203,7 +248,7 @@ class ApproachGoalVector():
                     # self.detection_info[pos] = (p_density, pos)
                     sum_power_density += p_density
                     position_density_vals.append((p_density, pos))
-                    positions.append((pos.x, pos.y, pos.z))
+                    positions.append((pos.x, pos.y, pos.z, p_density))
 
                 self.detection_priority.push(positions, sum_power_density)
 
@@ -220,17 +265,15 @@ class ApproachGoalVector():
         """computes the power density and returns the value"""
         return self.effector_power / (target_distance * 4*np.pi)
     
-
-    def get_best_approaches(self, num_approaches:int=5) -> list:
+    def find_optimal_approach_vectors(self, num_approaches:int=5) -> list:
         """returns the n best approaches to the goal location """
         best_approaches = []
-
+        
+        #reverse list of best approaches
         for i in range(num_approaches+1):
             best_approaches.append(self.detection_priority.pop_max())
-
+            
+        for i in range(len(best_approaches)):
+            best_approaches[i] = best_approaches[i][::-1]
+    
         return best_approaches
-    
-
-    
-    
-

@@ -42,7 +42,6 @@ from src.config.Config import utm_param
 import plotly.graph_objects as go
 import plotly.express as px
 
-
 class ApproachGoal():
     def __init__(self, 
                  goal_params:dict,
@@ -291,7 +290,6 @@ def create_cylinder(center, height, radius, base_height=1500):
     return x_grid, y_grid, z_grid
     
 if __name__ == '__main__':
-    
     n_cpus = multiprocessing.cpu_count()
     n_cpus = n_cpus - 10
     if n_cpus < 1:
@@ -346,9 +344,6 @@ if __name__ == '__main__':
 
     for path in best_approaches:
         for wp in path:
-        # for vals in detec[1]:
-        #     p_dense = vals[0]
-        #     pos = vals[1]
             x_vals.append(wp[0])
             y_vals.append(wp[1])
             z_vals.append(wp[2])
@@ -363,11 +358,11 @@ if __name__ == '__main__':
     #         z_vals.append(pos.z)
     #         p_dense_vals.append(p_dense)
             
-    
     data_handler = DataHandler()
     info_dictionary = {'x': x_vals, 'y': y_vals, 'z': z_vals, 'p_dense': p_dense_vals}
     formatted_df = pd.DataFrame(info_dictionary)
-    formatted_df = data_handler.scale_cartesian_with_terrain(formatted_df, grand_canyon)
+    formatted_df = data_handler.scale_cartesian_with_terrain(
+        formatted_df, grand_canyon)
     
     voxel_data = go.Scatter3d(
         x=x_vals,

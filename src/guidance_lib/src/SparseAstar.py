@@ -363,7 +363,7 @@ class SparseAstar():
         iterations = 0
         
         start_time = time.time()
-        max_time = 30 #seconds
+        max_time = 10 #seconds
 
         while (not self.open_set.empty() and iterations < max_iterations):
 
