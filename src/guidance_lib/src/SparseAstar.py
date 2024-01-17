@@ -147,7 +147,6 @@ class SparseAstar():
 
     def is_valid_position(self, position:PositionVector) -> bool:
         """Checks if position is valid based on grid constraints"""
-        
         if self.use_terrain:
             lat_dg, lon_dg = self.terrain_map.latlon_from_cartesian(
                 position.x, position.y)

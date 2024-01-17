@@ -75,7 +75,7 @@ if n_cpus < 1:
 
 data_handle = DataHandler()
 start_position = PositionVector(0, 0, 2000)
-goal_position  = PositionVector(1500, 1500, 1580)
+goal_position  = PositionVector(3800, 3800, 1000)
 
 grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                        lon_min = -112.5, 
@@ -96,7 +96,7 @@ fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
 fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
                                 max_climb_angle_dg=5,
                                 max_psi_turn_dg=25)
-fw_agent.leg_m = 25
+fw_agent.leg_m = 30
 fw_agent.set_goal_state(goal_position)
 
 ## create grid
@@ -229,10 +229,13 @@ for approach in best_approaches:
 # Create a ThreadPoolExecutor
 paths = []
 
+init_time = time.time()
 with ThreadPoolExecutor(max_workers=n_cpus) as executor:
     # Start two threads and get the future objects
     for i in range(len(approach_goal_list)):
         paths.append(executor.submit(run_different_goals, approach_goal_list[i]))
+final_time = time.time() - init_time
+print("final time to generate n routes: ", final_time)
 
 scatter_list = []
 
@@ -382,8 +385,6 @@ aproach_vector_plot = go.Scatter3d(
 )
 
 fig.add_trace(aproach_vector_plot)
-# fig.add_trace(trajectory)
-# fig.add_trace(trajectory2)
 
 #make another plot
 regular_voxels = go.Scatter3d(x=voxels['voxel_x'], y=voxels['voxel_y'], z=voxels['voxel_z'],
@@ -396,3 +397,6 @@ fig2.add_trace(regular_position)
 
 fig.show()
 # fig2.show()
+
+#save fig
+fig.write_html('ray trace approach' + '.html')

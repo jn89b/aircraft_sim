@@ -16,7 +16,7 @@
 
 
 - Aircraft naturally likes to climb at trim condition  
-- How do I regulate that? 
+- How do I regulate that?   
 
 # Regulating Airspeed and altitude 
 https://eng.libretexts.org/Bookshelves/Aerospace_Engineering/Aerodynamics_and_Aircraft_Performance_(Marchman)/05%3A_Altitude_Change-_Climb_and_Guide

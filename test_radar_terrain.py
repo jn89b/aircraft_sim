@@ -207,11 +207,14 @@ goal_2 = PositionVector(2500, 2500, 1600)
 goal_list = [goal_1, goal_2]
 # Create a ThreadPoolExecutor
 paths = []
+init_time = time.time()
 with ThreadPoolExecutor(max_workers=2) as executor:
     # Start two threads and get the future objects
     for i in range(len(goal_list)):
         paths.append(executor.submit(run_different_goals, goal_list[i]))
 
+final_time = time.time() - init_time
+print("final time to generate paths: ", final_time)
 scatter_list = []
 #make a color list based on the number of paths
 color_list = ['red', 'blue', 'green', 'orange', 'purple', 'yellow']
