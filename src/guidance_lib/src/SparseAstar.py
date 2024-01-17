@@ -64,14 +64,12 @@ class Node(object):
         self.total_distance = 0
         self.total_time = 0
         self.rcs_value = 0
-
-        
+     
     def get_direction_vector(self) -> np.array:
         return self.direction_vector
 
     def __lt__(self, other):
-        return self.f < other.f
-    
+        return self.f < other.f    
     # Compare nodes
     def __eq__(self, other):
         return self.position == other.position 
@@ -89,7 +87,10 @@ class SparseAstar():
                  max_rcs:float=1,
                  use_terrain:bool=False,
                  terrain_map:Terrain=None,
-                 terrain_buffer_m:float=50) -> None:
+                 terrain_buffer_m:float=50,
+                 use_dynamic_threats:bool=False,
+                 dynamic_threats:list=None,
+                 dynamic_threat_weight:float=0) -> None:
                 
         self.open_set = PriorityQueue()
         self.closed_set = {}
@@ -109,6 +110,10 @@ class SparseAstar():
         self.use_terrain = use_terrain
         self.terrain_map = terrain_map
         self.terrain_buffer_m = terrain_buffer_m
+        
+        self.use_dynamic_threats = use_dynamic_threats
+        self.dynamic_threats = dynamic_threats
+        self.dynamic_threat_weight = dynamic_threat_weight
 
     def clear_sets(self):
         self.open_set = PriorityQueue()
@@ -129,7 +134,7 @@ class SparseAstar():
                                self.velocity, 0,
                                self.agent.theta_dg, self.agent.psi_dg)
         
-        if self.use_radar == True:
+        if self.use_radar:
             radar_cost, rcs_val = self.get_radar_cost(self.start_node)
             self.start_node.radar_cost = radar_cost
             self.start_node.rcs_value = rcs_val
@@ -381,15 +386,12 @@ class SparseAstar():
             if current_node.position == self.goal_node.position:
                 print("time", current_time)
                 print("found goal", current_node.position)
-                return self.return_path(current_node)
-            
+                return self.return_path(current_node)           
             #check if close to goal 
             if self.compute_distance(current_node, self.goal_node) < self.agent.leg_m:
                 print("time", current_time)
                 print("found goal", current_node.position)
-                return self.return_path(current_node)
-            
-            
+                return self.return_path(current_node)            
             if iterations >= max_iterations:
                 print("iterations", iterations)
                 return self.return_path(current_node)
@@ -415,6 +417,40 @@ class SparseAstar():
 
                 neighbor = Node(current_node, move, self.velocity, 
                                 current_node.psi_dg)
+                
+                traj_time = neighbor.total_distance / self.velocity
+                threat_total_cost = 0
+
+                if self.use_dynamic_threats:
+                    for threat in self.dynamic_threats:    
+                        if threat.is_inside_radar(neighbor.position.x, 
+                                                  neighbor.position.y, 
+                                                  neighbor.position.z):
+                            #compute cost
+                            threat_position = threat.ellipse_trajectory(traj_time)
+                            dy = neighbor.position.y - radar.pos.y
+                            dx = neighbor.position.x - radar.pos.x
+                            rel_psi_dg = np.arctan2(dy, dx) * 180 / np.pi
+                            rel_psi_dg = rel_psi_dg - neighbor.psi_dg + 180
+
+                            if rel_psi_dg > 360:
+                                rel_psi_dg -= 360
+                            if rel_psi_dg < 0:
+                                rel_psi_dg += 360
+
+                            distance_from_threat = np.linalg.norm(
+                                neighbor.position.vec - threat_position)
+                            
+                            rcs_key = self.get_key(
+                                int(rel_psi_dg),
+                                int(0)
+                            )
+                            
+                            if rcs_key in self.rcs_hash:
+                                threat_cost = threat.compute_prob_detect(distance_from_threat,
+                                                                        self.rcs_hash[rcs_key])
+                                
+                            threat_total_cost += threat_cost
 
                 #compute heuristic based on radar 
                 if self.use_radar:
@@ -430,8 +466,6 @@ class SparseAstar():
 
                         rel_phi_dg = neighbor.phi_dg
                         rel_theta_dg = neighbor.theta_dg - (90 - radar.elevation_angle_dg)
-                        # rel_psi_dg = wrapped_psi_dg - radar.azmith_angle_dg
-                        # rel_psi_dg = radar.azmith_angle_dg - wrapped_psi_dg
 
                         dy = neighbor.position.y - radar.pos.y
                         dx = neighbor.position.x - radar.pos.x
@@ -518,7 +552,7 @@ class SparseAstar():
                                         break
                 
                     if len(radar_probs) > 1:
-                        radar_cost = (1 - np.prod(1 - np.array(radar_probs))) #*np.sqrt(len(radar_probs))
+                        radar_cost = (1 - np.prod(1 - np.array(radar_probs)))
                         # continue
                     elif len(radar_probs) == 1:
                         radar_cost = radar_probs[0]
@@ -535,9 +569,11 @@ class SparseAstar():
                     
                 neighbor.g = current_node.g + 1
                 neighbor.h = (self.compute_distance(neighbor, self.goal_node))
-                neighbor.f = neighbor.g +  neighbor.h + neighbor.radar_cost + height_cost
-                neighbor.total_distance = current_node.total_distance + self.compute_distance(neighbor, current_node)
-                neighbor.total_time = neighbor.total_distance / self.velocity
+                neighbor.f = neighbor.g +  neighbor.h + neighbor.radar_cost + \
+                    height_cost + (threat_total_cost*self.dynamic_threat_weight)
+                neighbor.total_distance = current_node.total_distance + \
+                    self.compute_distance(neighbor, current_node)
+                neighbor.total_time = traj_time
                 self.open_set.put((neighbor.f, neighbor))
 
         return self.return_path(current_node)

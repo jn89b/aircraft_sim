@@ -83,6 +83,8 @@ planner_states.to_csv('planner_states.csv')
 formatted_states = data_handler.scale_cartesian_with_terrain(planner_states, 
                                                          grand_canyon)
 
+
+
 #plot in 2D
 fig, ax = plt.subplots()
 ax.plot(planner_states['x'], planner_states['y'], 'o-')

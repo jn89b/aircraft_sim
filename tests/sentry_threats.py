@@ -7,25 +7,25 @@ class SentryThreats():
     """    
     def __init__(self, init_position:np.ndarray,
                  prev_position:np.ndarray,
-                 velocity:float, 
+                 velocity_m:float, 
                  heading_rad:float=0,
                  use_ellipse:bool=True,
                  ellipse_params:dict=None,
                  radar_params:dict=None) -> None:
         
-        self.position = init_position
+        self.position      = init_position
         self.prev_position = prev_position
-        self.velocity = velocity
-        self.radar_params = radar_params
-        self.heading_rad = heading_rad
+        self.velocity_m    = velocity_m
+        self.radar_params  = radar_params
+        self.heading_rad   = heading_rad
         
         if use_ellipse:
             self.use_ellipse = True
             self.ellipse_params = ellipse_params
             
     def ellipse_trajectory(self, t:float) -> np.ndarray:
-        x = self.ellipse_params['a'] * np.cos(t)
-        y = self.ellipse_params['b'] * np.sin(t)
+        x = 1 + self.ellipse_params['a'] * np.cos(t)
+        y = 1 + self.ellipse_params['b'] * np.sin(t)
         z = self.position[2]
         self.prev_position = self.position
     
@@ -38,7 +38,7 @@ class SentryThreats():
                                             self.position[0] - self.prev_position[0])
             return self.position
         else:
-            return self.init_position + self.velocity * t
+            return self.init_position + self.velocity_m * t
 
     def is_inside_radar(self, x:float, y:float, z:float) -> bool:
         radar_range_a = self.radar_params['range_a']

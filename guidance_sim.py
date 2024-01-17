@@ -14,6 +14,7 @@ from src.guidance_lib.src.Obstacle import Obstacle
 from src.guidance_lib.src.SparseAstar import SparseAstar
 from src.guidance_lib.src.Config.radar_config import RADAR_AIRCRAFT_HASH_FILE
 from src.guidance_lib.src.DataContainer import SimDataContainer
+from src.guidance_lib.src.SentryThreats import SentryThreats
 
 """
 To do 

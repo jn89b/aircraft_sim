@@ -211,7 +211,8 @@ class Radar():
         # return 1 - (dist/self.radar_range_m)
         return 1 
     
-    def compute_prob_detect(self, dist, rcs_val:float, is_linear_db:bool=False) -> float:
+    def compute_prob_detect(self, dist:float, rcs_val:float, 
+                            is_linear_db:bool=False) -> float:
         """
         Computes the probability of detection for the radar
         """
