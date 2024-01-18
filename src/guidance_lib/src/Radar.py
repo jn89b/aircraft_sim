@@ -291,7 +291,7 @@ class Radar():
         name='voxel_data',
         marker=dict(
             color=radar_info['voxel_vals'],
-            colorscale='Viridis',
+            colorscale='Emrld',
             # color_discrete_sequence=px.colors.qualitative.Plotly,
             size=3,
             opacity=0.1

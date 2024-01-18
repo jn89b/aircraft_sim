@@ -388,19 +388,19 @@ class SparseAstar():
                 print("found goal", current_node.position)
                 return self.return_path(current_node)           
             #check if close to goal 
-            if self.compute_distance(current_node, self.goal_node) < self.agent.leg_m:
-                print("time", current_time)
-                print("found goal", current_node.position)
-                return self.return_path(current_node)            
+            # if self.compute_distance(current_node, self.goal_node) < self.agent.leg_m:
+            #     print("time", current_time)
+            #     print("found goal", current_node.position)
+            #     return self.return_path(current_node)            
             if iterations >= max_iterations:
                 print("iterations", iterations)
                 return self.return_path(current_node)
                 # break
 
-            if self.compute_distance(current_node, self.goal_node) < self.agent.leg_m:
-                print("time", current_time)
-                print("found goal", current_node.position)
-                return self.return_path(current_node)
+            # if self.compute_distance(current_node, self.goal_node) < self.agent.leg_m:
+            #     print("time", current_time)
+            #     print("found goal", current_node.position)
+            #     return self.return_path(current_node)
 
             expanded_moves = self.get_legal_moves(
                 current_node, current_node.psi_dg)

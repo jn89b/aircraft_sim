@@ -10,7 +10,8 @@ class SentryThreats():
                  heading_rad:float=0,
                  use_ellipse:bool=True,
                  ellipse_params:dict=None,
-                 radar_params:dict=None) -> None:
+                 radar_params:dict=None,
+                 reverse:bool=False) -> None:
         
         self.position      = init_position
         self.prev_position = prev_position
@@ -18,16 +19,21 @@ class SentryThreats():
         self.radar_params  = radar_params
         self.heading_rad   = heading_rad
         self.radar         = Radar(radar_params)
+        self.reverse       = reverse
         
         if use_ellipse:
             self.use_ellipse = True
             self.ellipse_params = ellipse_params
             
     def ellipse_trajectory(self, t:float) -> np.ndarray:
-        x = self.position[0] + self.ellipse_params['a'] * np.cos(t)
-        y = self.position[1] + self.ellipse_params['b'] * np.sin(t)
+        
+        if self.reverse:
+            t = -t
+        
+        x = self.position[0] + (self.ellipse_params['a'] * np.cos(self.velocity_m*t))
+        y = self.position[1] + (self.ellipse_params['b'] * np.sin(self.velocity_m*t))
         z = self.position[2]
-        self.prev_position = self.position
+        #self.prev_position = self.position
     
         return np.array([x, y, z])
 

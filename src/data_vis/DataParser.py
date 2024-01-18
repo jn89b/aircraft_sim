@@ -25,12 +25,14 @@ class DataHandler():
         theta_dg = [state[3] for state in states]
         phi_dg = [state[4] for state in states]
         psi_dg = [state[5] for state in states]
+        time_vector = [state[10] for state in states]
 
         #return a dataframe
         planner_states = pd.DataFrame({'x':x, 'y':y, 'z':z, 
                                     'theta_dg':theta_dg, 
                                     'phi_dg':phi_dg, 
-                                    'psi_dg':psi_dg})
+                                    'psi_dg':psi_dg, 
+                                    'time':time_vector})
 
         return planner_states
 

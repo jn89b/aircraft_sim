@@ -32,9 +32,9 @@ goal_position  = PositionVector(3500, 3500, 1200)
 
 grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                        lon_min = -112.5, 
-                       lon_max = -112.45, 
+                       lon_max = -112.47, 
                        lat_min = 36.2, 
-                       lat_max = 36.25,
+                       lat_max = 36.23,
                        utm_zone=utm_param['grand_canyon'])
 
 
@@ -82,8 +82,6 @@ planner_states.to_csv('planner_states.csv')
 
 formatted_states = data_handler.scale_cartesian_with_terrain(planner_states, 
                                                          grand_canyon)
-
-
 
 #plot in 2D
 fig, ax = plt.subplots()

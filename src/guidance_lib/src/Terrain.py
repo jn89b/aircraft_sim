@@ -172,7 +172,7 @@ class Terrain():
         self.expanded_array = self.expand_array(z1, step_number)
         x1 = np.arange(0, self.expanded_array.shape[0], 1)
         y1 = np.arange(0, self.expanded_array.shape[1], 1)
-        surface = go.Surface(z = self.expanded_array, x = x1, y= y1)
+        surface = go.Surface(z = self.expanded_array, x = x1, y= y1, showscale=False)
         
         # Customize the z-axis limits
         # z_min = 0
@@ -182,6 +182,8 @@ class Terrain():
         
         fig.update_layout(
             scene = dict(zaxis = dict(nticks=4, range=[z_min, z_max])))
+        
+        # fig.update(layout_coloraxis_showscale=False)
                 
         # fig.show()
         return fig

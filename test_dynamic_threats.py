@@ -7,6 +7,7 @@ from src.guidance_lib.src.PositionVector import PositionVector
 from src.guidance_lib.src.SparseAstar import SparseAstar
 from src.guidance_lib.src.Config.radar_config import RADAR_AIRCRAFT_HASH_FILE
 from src.guidance_lib.src.SentryThreats import SentryThreats
+from src.guidance_lib.src.utils import create_cylinder
 
 import pandas as pd
 import numpy as np
@@ -16,7 +17,8 @@ import plotly.graph_objects as go
 from src.data_vis.DataParser import DataHandler
 
 from concurrent.futures import ThreadPoolExecutor
-
+#interpolate the data
+from scipy.interpolate import interp1d
 
 def run_different_goals(goalPostiion:PositionVector):
     # Initialize SparseAstar
@@ -58,7 +60,7 @@ def run_different_dynamic_threats(threats:list, dynamic_threat_weight:int):
     #                            use_radar=True, radar_info=radars,
     #                            rcs_hash=rcs_hash,
     #                            radar_weight=100)
-    radar_heuristic_weight = 1    
+    radar_heuristic_weight = 10    
     sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
                                 use_terrain=True, velocity=15,
                                 terrain_buffer_m=60, 
@@ -85,7 +87,7 @@ def run_different_dynamic_threats(threats:list, dynamic_threat_weight:int):
 def run_sparse_astar(radar_heuristic_weight=100):
     # Initialize SparseAstar
     sparse_astar = SparseAstar(grid=grid, terrain_map=grand_canyon, 
-                               use_terrain=True, velocity=15,
+                               use_terrain=True, velocity=35,
                                terrain_buffer_m=60, 
                                use_radar=True, radar_info=radars,
                                rcs_hash=rcs_hash,
@@ -119,9 +121,9 @@ goal_position  = PositionVector(1500, 1500, 1580)
 
 grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
                        lon_min = -112.5, 
-                       lon_max = -112.45, 
+                       lon_max = -112.48, 
                        lat_min = 36.2, 
-                       lat_max = 36.25,
+                       lat_max = 36.22,
                        utm_zone=utm_param['grand_canyon'])
 
 # grand_canyon = Terrain('tif_data/n36_w113_1arc_v3.tif', 
@@ -156,17 +158,17 @@ z_min = 1000
 grid = Grid(agent=fw_agent, x_max_m=x_max, y_max_m=y_max, 
             z_max_m=z_max, z_min_m=z_min)
 
-obs_positions = [(1000,1000,10)]
+obs_positions = [(1250,1250,100)]
 obs_list = []
 for pos in obs_positions:
     obs_position = PositionVector(pos[0], pos[1], pos[2])
-    radius_obs_m = 5
+    radius_obs_m = 50
     some_obstacle = Obstacle(obs_position, radius_obs_m)
     obs_list.append(some_obstacle)
     grid.insert_obstacles(some_obstacle)
 
 radar_pos = PositionVector(500, 500, 1970)
-radar_pos2 = PositionVector(700, 750, 1925)
+radar_pos2 = PositionVector(800, 750, 1950)
 print('radar pos: ', radar_pos2.x, radar_pos2.y, radar_pos2.z)
 start_lat, start_lon = grand_canyon.latlon_from_cartesian(radar_pos2.x, radar_pos2.y) 
 start_elevation = grand_canyon.get_elevation_from_latlon(start_lat,start_lon)
@@ -177,7 +179,7 @@ radar_params = {
     'pos': radar_pos,
     'azimuth_angle_dg': 45,
     'elevation_angle_dg': 80, #this is wrt to z axis
-    'radar_range_m': 50,    
+    'radar_range_m': 200,    
     'max_fov_dg': 120,  
     'vert_max_fov_dg': 80,
     'c1': -0.29,
@@ -190,7 +192,7 @@ radar_params2 = {
     'pos': radar_pos2,
     'azimuth_angle_dg': 45,
     'elevation_angle_dg': 80, #this is wrt to z axis
-    'radar_range_m': 50,    
+    'radar_range_m': 200,    
     'max_fov_dg': 120,  
     'vert_max_fov_dg': 80,
     'c1': -0.29,
@@ -220,11 +222,33 @@ print("final time jit: ", final_time)
 
 ## DYNAMIC THREATS
 threat_1_position = PositionVector(300, 450, 2000)
-threat_1_velocity = 15
+threat_1_velocity = 0.002
 threat_1_heading = 0
 use_ellipse = True
-ellipse_params = {'a': 200, 'b': 50}
+ellipse_params = {'a': 300, 'b': 100}
 threat_1_radar_params = {
+    'pos': threat_1_position,
+    'azimuth_angle_dg': 0,
+    'elevation_angle_dg': 0, #this is wrt to z axis
+    'radar_range_m': 250,    
+    'max_fov_dg': 120,  
+    'vert_max_fov_dg': 80,
+    'c1': -0.29,
+    'c2': 1200,
+    'radar_fq_hz': 10000,
+    'grid': None
+}
+
+ellipse_params_2 = {'a': 200, 'b': 200}
+
+threat_2_position = PositionVector(800, 800, 1975)
+threat_1 = SentryThreats(threat_1_position.vec, threat_1_position.vec, threat_1_velocity,
+                        threat_1_heading, use_ellipse, ellipse_params, threat_1_radar_params)
+
+
+
+threat_2_velocity = 0.00099
+threat_2_radar_params = {
     'pos': threat_1_position,
     'azimuth_angle_dg': 0,
     'elevation_angle_dg': 0, #this is wrt to z axis
@@ -236,14 +260,13 @@ threat_1_radar_params = {
     'radar_fq_hz': 10000,
     'grid': None
 }
+threat_2 = SentryThreats(threat_2_position.vec, threat_1_position.vec, threat_2_velocity,
+                        threat_1_heading, use_ellipse, ellipse_params_2, threat_2_radar_params,
+                        reverse=True)
 
 
-threat_2_position = PositionVector(750, 750, 2000)
-threat_1 = SentryThreats(threat_1_position.vec, threat_1_position.vec, threat_1_velocity,
-                        threat_1_heading, use_ellipse, ellipse_params, threat_1_radar_params)
-
-threat_2 = SentryThreats(threat_2_position.vec, threat_1_position.vec, threat_1_velocity,
-                        threat_1_heading, use_ellipse, ellipse_params, threat_1_radar_params)
+# threat_2 = SentryThreats(threat_2_position.vec, threat_1_position.vec, threat_1_velocity,
+#                         threat_1_heading, use_ellipse, ellipse_params_2, threat_1_radar_params)
 
 threats = [threat_1, threat_2]                   
 #%% 
@@ -275,7 +298,7 @@ radars = [radar1, radar2]
 
 num_worker = 4
 #weights = [0, 0.1, 0.5, 1]
-dynamic_threat_weights = [0, 1000]
+dynamic_threat_weights = [1000]
 
 goal_1 = PositionVector(1500, 1500, 1580)
 goal_2 = PositionVector(2500, 2500, 1600)
@@ -292,14 +315,14 @@ with ThreadPoolExecutor(max_workers=2) as executor:
         paths.append(executor.submit(run_different_dynamic_threats, threats, 
                                      dynamic_threat_weights[i]))
 
-
+colorscale = 'HSV'
 #%% 
 final_time = time.time() - init_time
 print("final time to generate paths: ", final_time)
 scatter_list = []
 time_list = []
 #make a color list based on the number of paths
-color_list = ['red', 'blue', 'green', 'orange', 'purple', 'yellow']
+color_list = ['blue', 'green', 'orange', 'purple', 'yellow']
 for i, p in enumerate(paths):
     results = p.result()
     traj_time = results[:,9]
@@ -314,37 +337,112 @@ for i, p in enumerate(paths):
                                 ),
                             marker=dict(
                                 color=planner_state['z'],
-                                colorscale='Viridis',
+                                colorscale=colorscale,
                                 size=3,
                                 opacity=0.1,
-                                colorbar=dict(
-                                    title='Range From Source Radar',
-                                    x=0)
                                 ),
                             name='planner trajectory'
                             ))
     time_list.append(traj_time)
 
+#%% 
+import matplotlib.pyplot as plt
+
+result = p.result()
+x = result[:,0]
+y = result[:,1]
+z = result[:,2]
+phi = result[:,3]
+theta = result[:,4]
+psi = result[:,5]
+time_vector = result[:,9]
+
+#interpolate the trajectory
+time_interp = np.linspace(0, time_vector[-1], 500)
+x_interp = np.interp(time_interp, time_vector, x)
+y_interp = np.interp(time_interp, time_vector, y)
+z_interp = np.interp(time_interp, time_vector, z)  
+
+#plot 3d trajectory
+fig,ax = plt.subplots(1,1, subplot_kw={'projection': '3d'})
+ax.plot3D(x_interp, y_interp, z_interp, 'gray')
+fig.show()
+
+inter_df = pd.DataFrame({'x':x_interp, 'y':y_interp, 'z':z_interp})
+inter_df = data_handle.scale_cartesian_with_terrain(inter_df, grand_canyon)
+
+interpolated_traj = go.Scatter3d(x=inter_df['x'],
+                                 y=inter_df['y'],
+                                 z=inter_df['z'],
+                                 line=dict(
+                                     color=time_interp,
+                                     colorscale=colorscale,
+                                     width=4,
+                                    #  opacity=0.8,
+                                 ),
+                                 marker=dict(
+                                     color=time_interp,
+                                     colorscale=colorscale,
+                                     size=3,
+                                     opacity=0.3,
+                                 ),
+                                 name='planner trajectory')
+
 #%% Compute trajectory of threats
 overall_threat_trajectories = []
+# for threat in threats:
+#     for times in time_list:
+#         threat_trajectory = []
+#         for t in times:
+#             position = threat.ellipse_trajectory(t)
+#             threat_trajectory.append(position)
+#         threat_trajectory = np.array(threat_trajectory)
+        
+#         #convert to dataframe 
+#         threat_trajectory = pd.DataFrame({'x':threat_trajectory[:,0],
+#                                             'y':threat_trajectory[:,1],
+#                                             'z':threat_trajectory[:,2]})
+        
+#         #scale the trajectory
+#         threat_trajectory = data_handle.scale_cartesian_with_terrain(threat_trajectory, 
+#                                                                      grand_canyon)
+        
+#         overall_threat_trajectories.append(threat_trajectory)
+
 for threat in threats:
-    for times in time_list:
-        threat_trajectory = []
-        for t in times:
-            position = threat.ellipse_trajectory(t)
-            threat_trajectory.append(position)
-        threat_trajectory = np.array(threat_trajectory)
+    threat_trajectory = []
+    
+    for t in time_interp:
+        position = threat.ellipse_trajectory(t)
+        threat_trajectory.append(position)
+    
+    threat_trajectory = np.array(threat_trajectory)
+    threat_trajectory = pd.DataFrame({'x':threat_trajectory[:,0],
+                                      'y':threat_trajectory[:,1],
+                                      'z':threat_trajectory[:,2]})
+    threat_trajectory = data_handle.scale_cartesian_with_terrain(threat_trajectory,
+                                                                 grand_canyon)
+
+    overall_threat_trajectories.append(threat_trajectory)
         
-        #convert to dataframe 
-        threat_trajectory = pd.DataFrame({'x':threat_trajectory[:,0],
-                                            'y':threat_trajectory[:,1],
-                                            'z':threat_trajectory[:,2]})
         
-        #scale the trajectory
-        threat_trajectory = data_handle.scale_cartesian_with_terrain(threat_trajectory, 
-                                                                     grand_canyon)
-        
-        overall_threat_trajectories.append(threat_trajectory)
+#plot the threat trajectories as a function of time
+fig,ax = plt.subplots(1,1, subplot_kw={'projection': '3d'})
+
+#color scale for time
+for threat in overall_threat_trajectories:
+    #ax.plot3D(threat['x'], threat['y'], threat['z'], 'gray')
+    ax.scatter3D(threat['x'], threat['y'], threat['z'], c=time_interp, cmap='viridis')
+    
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_zlabel('z')
+
+#show colorbar
+fig.colorbar(ax.collections[0], ax=ax, label='time')
+ax.legend()
+fig.show()
+   
 
 #%% 
 
@@ -352,7 +450,7 @@ detect_info = detection_info_jit.items()
 voxels = radar1.get_voxels(detect_info,100)
 voxels_normalized = data_handle.format_radar_data_with_terrain(voxels, grand_canyon)
 voxel_visualizer = radar1.get_visual_scatter_radar(voxels_normalized)
-fig = grand_canyon.plot_3d_expanded(1, 0 , 2200)
+fig = grand_canyon.plot_3d_expanded(1, 1300 , 2200)
 
 detect_info2 = detection_info_jit2.items()
 voxels2 = radar2.get_voxels(detect_info2,100)
@@ -364,7 +462,10 @@ x_goal = goal_position.x/(grand_canyon.max_x - grand_canyon.min_x) * grand_canyo
 y_goal = goal_position.y/(grand_canyon.max_y - grand_canyon.min_y) * grand_canyon.expanded_array.shape[1]
 z_goal = goal_position.z
 
-fig.add_trace(go.Scatter3d(x=[x_goal], y=[y_goal], z=[z_goal], mode='markers', marker=dict(color='green', size=5)))
+fig.add_trace(go.Scatter3d(x=[x_goal], y=[y_goal], z=[z_goal], 
+                           mode='markers', 
+                           name='Goal',
+                           marker=dict(color='green', size=5)))
 
 #plot the original position
 x_pos = radar_pos.x/(grand_canyon.max_x - grand_canyon.min_x) * grand_canyon.expanded_array.shape[0]
@@ -376,40 +477,90 @@ x_pos2 = radar_pos2.x/(grand_canyon.max_x - grand_canyon.min_x) * grand_canyon.e
 y_pos2 = radar_pos2.y/(grand_canyon.max_y - grand_canyon.min_y) * grand_canyon.expanded_array.shape[1]
 z_pos2 = radar_pos2.z
 
-fig.add_trace(go.Scatter3d(x=[x_pos], y=[y_pos], z=[z_pos], mode='markers', marker=dict(color='red', size=5)))
+fig.add_trace(go.Scatter3d(x=[x_pos], y=[y_pos], z=[z_pos], 
+                           name='Radar 1',
+                           mode='markers', marker=dict(color='red', size=5)))
 fig.add_trace(voxel_visualizer)
 
-fig.add_trace(go.Scatter3d(x=[x_pos2], y=[y_pos2], z=[z_pos2], mode='markers', marker=dict(color='red', size=5)))
+fig.add_trace(go.Scatter3d(x=[x_pos2], y=[y_pos2], z=[z_pos2],
+                           name = 'Radar 2', 
+                           mode='markers', marker=dict(color='red', size=5)))
 fig.add_trace(voxel_visualizer2)
 
-for scatter in scatter_list:
-    fig.add_trace(scatter)
+# for scatter in scatter_list:
+#     fig.add_trace(scatter)
+
+fig.add_trace(interpolated_traj)
     
-
-
 #make another plot
-regular_voxels = go.Scatter3d(x=voxels['voxel_x'], y=voxels['voxel_y'], z=voxels['voxel_z'],
+regular_voxels = go.Scatter3d(x=voxels['voxel_x'], y=voxels['voxel_y'], 
+                              z=voxels['voxel_z'],
                               mode='markers', marker=dict(color='blue', size=5))
 
-regular_voxels2 = go.Scatter3d(x=voxels2['voxel_x'], y=voxels2['voxel_y'], z=voxels2['voxel_z'],
+regular_voxels2 = go.Scatter3d(x=voxels2['voxel_x'], y=voxels2['voxel_y'], 
+                               z=voxels2['voxel_z'],
                               mode='markers', marker=dict(color='blue', size=5))
 
-regular_position = go.Scatter3d(x=[radar_pos.x], y=[radar_pos.y], z=[radar_pos.z], mode='markers', 
+regular_position = go.Scatter3d(x=[radar_pos.x], y=[radar_pos.y], z=[radar_pos.z], 
+                                mode='markers', 
                                 marker=dict(color='red', size=5))
-regular_position2 = go.Scatter3d(x=[radar_pos2.x], y=[radar_pos2.y], z=[radar_pos2.z], mode='markers', 
+regular_position2 = go.Scatter3d(x=[radar_pos2.x], y=[radar_pos2.y], z=[radar_pos2.z], 
+                                 mode='markers', 
                                 marker=dict(color='red', size=5))
-
 
 #plot threat trajectories
-color_threats = ['red', 'orange', 'red', 'orange']
+color_threats = ['red', 'black', 'red']
+time_marker = dict(color=time_interp, 
+                   colorscale=colorscale,
+                   size = 3 , 
+                   opacity=0.9,
+                   colorbar=dict(thickness=20,
+                                 x=-0.15,   
+                                 title='Time (s)',))
 for i, threat_trajectory in enumerate(overall_threat_trajectories):
+    #color gradient as a function of time
+    # fig.add_trace(go.Scatter3d(x=threat_trajectory['x'],
+    #                            y=threat_trajectory['y'],
+    #                            z=threat_trajectory['z'],
+    #                            name = 'Dynamic Threat Trajectory',
+    #                            mode='lines',
+                               
+    threat_name = 'Dynamic Threat Trajectory ' + str(i+1)
+    line_threat = dict(color=color_threats[i], width=1, dash='dash',)
     fig.add_trace(go.Scatter3d(x=threat_trajectory['x'], 
                                y=threat_trajectory['y'], 
                                z=threat_trajectory['z'],
-                               name='Dynamic Threat Trajectory',
-                               mode='lines', 
-                               marker=dict(color=color_threats[i], size=5)),)
+                               name= threat_name,
+                            #    mode='lines', 
+                                line=line_threat,
+                               marker=time_marker,))
 
+
+# # plot obstacles
+# for obs in obs_list:
+#     obs_position = obs.position
+#     radius = obs.radius_m
+#     #get elevation at the obstacle position
+#     lat_dg, lon_dg = grand_canyon.latlon_from_cartesian(obs_position.x, obs_position.y)
+#     elevation = grand_canyon.get_elevation_from_latlon(lat_dg, lon_dg)
+#     base_height = elevation
+#     elevated_z = base_height + obs_position.z
+#     x, y, z = create_cylinder((obs_position.x, obs_position.y), elevated_z, elevation)
+#     #scale x y z 
+#     x = x/(grand_canyon.max_x - grand_canyon.min_x) * grand_canyon.expanded_array.shape[0]
+#     y = y/(grand_canyon.max_y - grand_canyon.min_y) * grand_canyon.expanded_array.shape[1]
+    
+#     # z = z/(grand_canyon.max_z - grand_canyon.min_z) * grand_canyon.expanded_array.shape[2]
+#     # df = pd.DataFrame({'x':x, 'y':y, 'z':z})
+#     # df = data_handle.scale_cartesian_with_terrain(df, grand_canyon)
+    
+#     fig.add_surface(x=x, y=y, z=z, 
+#                     colorscale='Greys', showscale=False, opacity=0.5)
+
+#remove the colorbar
+fig.update_layout(coloraxis_showscale=False)
+
+# fig.update_traces(marker_showscale=False)
 fig.show()
 
 #save as html 
@@ -420,3 +571,5 @@ fig.write_image('terrain_avoidance_radar.png')
 
 
 # fig2.show()
+
+# %%
