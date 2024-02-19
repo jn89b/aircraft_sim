@@ -251,8 +251,6 @@ class DataVisualization():
             time_span = 100 # len(self.data)
             alpha_vec = np.linspace(0, 1, time_span)
 
-
-
             self.ax1.scatter(self.data['x'][frame], 
                             self.data['y'][frame], 
                             self.data['z'][frame], color='b', label='Position')
@@ -321,7 +319,6 @@ class DataVisualization():
                 else:
                     interval = i - time_span
                 
-
                 #set lines 
                 line.set_data(x_list[j][interval:i], y_list[j][interval:i])
                 line.set_3d_properties(z_list[j][interval:i])

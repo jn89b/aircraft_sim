@@ -209,6 +209,9 @@ class SparseAstar():
         returns the path from start to goal
         in the form of a list of states
         
+        where each state is a list of the form
+        [x,y,z,theta_dg,phi_dg,psi_dg,rcs_value,radar_detection,radar_cost]
+        
         """
         path = []
         current = current_node

@@ -13,7 +13,6 @@ from src.math_lib.VectorOperations import euler_dcm_body_to_inertial, euler_dcm_
 df = pd.read_csv("SIM_Plane_h_vals.csv")
 airplane_params = get_airplane_params(df)
 linear_aircraft = LinearizedAircraft(airplane_params)
-
 init_states = {
     'u': 25,
     'w': 0.924,
@@ -57,6 +56,20 @@ B_lon = linear_aircraft.compute_B_lon(init_states['u'])
 B_lat = linear_aircraft.compute_B_lat(init_states['u'])
 B_full = linear_aircraft.compute_B_full(init_states['u'])
 eigen_values = np.linalg.eig(A_full)[0]
+
+# save the matrices to csv 
+# np.savetxt("A_lon.csv", A_lon, delimiter=",")
+# np.savetxt("A_lat.csv", A_lat, delimiter=",")
+
+#column names 
+A_full_columns = ['u', 'w', 'q', 'theta', 'h', 'x', 'v', 'p', 'r', 'phi', 'psi', 'y']
+#convert to dataframe
+A_full_df = pd.DataFrame(A_full, columns=A_full_columns)
+#save as a csv
+A_full_df.to_csv("A_full.csv", index=False)
+
+# np.savetxt("A_full.csv", A_full, delimiter=",")
+# np.savetxt("B_full.csv", B_full, delimiter=",")
 
 with open('A_full.pkl', 'wb') as f:
     pkl.dump(A_full, f)
@@ -160,17 +173,4 @@ ax[2].plot(time_vec, np.rad2deg(control_history[:,2]))
 ax[2].set_ylabel("delta_a (deg)")
 ax[3].plot(time_vec, np.rad2deg(control_history[:,3]))
 ax[3].set_ylabel("delta_r (deg)")
-
-
-
 plt.show()
-
-
-#plot the eigen values
-# plt.scatter(np.real(eigen_values), np.imag(eigen_values))
-# plt.show()
-
-# #find how many 0's are in the A matrix  
-# num_zeros = A_full.size - np.count_nonzero(A_full)
-
-# print("Number of zeros:", num_zeros)

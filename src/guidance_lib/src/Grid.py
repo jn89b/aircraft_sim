@@ -47,13 +47,15 @@ class FWAgent():
 
     def vehicle_constraints(self, horizontal_min_radius_m:float=35, 
                             max_climb_angle_dg:float=10, 
-                            max_psi_turn_dg:float=45) -> None:
+                            max_psi_turn_dg:float=45,
+                            leg_m:float=25) -> None:
         """
         horizontal_min_turn = v^2/ (g * tan(phi)) where theta is bank angle
         """
         self.horizontal_min_radius_m = horizontal_min_radius_m
         self.max_climb_angle_dg = max_climb_angle_dg
         self.max_psi_turn_dg = max_psi_turn_dg
+        self.leg_m = leg_m
 
     #this can be sped up 
     def get_moves(self, position:PositionVector, curr_psi_dg:float,
