@@ -4,6 +4,9 @@ global-exclude *.pyc
 # ignore pycache
 global-exclude __pycache__
 
+# ignore everything in venv
+global-exclude venv
+
 **/__pycache__/
 
 */__pycache__/*
