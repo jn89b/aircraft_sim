@@ -299,16 +299,16 @@ for wp in rest_of_waypoints:
     dz     = goal_z - start_state[4]
     lateral_distance = np.sqrt(dx**2 + dy**2)
     
-    new_vel = velocity
-    new_w = 0.0
-    new_q = 0.0
-    new_theta = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
-    # new_x = 250
-    new_v = 0.0
-    new_p = 0.0     
-    new_r = 0.0
-    new_phi = np.deg2rad(0.0)
-    new_y = 0.0
+    # new_vel = velocity
+    # new_w = 0.0
+    # new_q = 0.0
+    # new_theta = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
+    # # new_x = 250
+    # new_v = 0.0
+    # new_p = 0.0     
+    # new_r = 0.0
+    # new_phi = np.deg2rad(0.0)
+    # new_y = 0.0
     
     error = np.sqrt(dx**2 + dy**2 + dz**2)
         
@@ -317,18 +317,18 @@ for wp in rest_of_waypoints:
     else:
         new_psi = goal_psi
 
-    goal_state = np.array([new_vel,
-                            new_w,
-                            new_q,
-                            new_theta,
-                            goal_z,
-                            goal_x,
-                            new_v,
-                            new_p,
-                            new_r,
-                            new_phi,
-                            new_psi,
-                            new_y])
+    # goal_state = np.array([new_vel,
+    #                         new_w,
+    #                         new_q,
+    #                         new_theta,
+    #                         goal_z,
+    #                         goal_x,
+    #                         new_v,
+    #                         new_p,
+    #                         new_r,
+    #                         new_phi,
+    #                         new_psi,
+    #                         new_y])
     
     print("Moving to the next waypoint")
         
