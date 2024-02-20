@@ -59,7 +59,7 @@ class FWAgent():
 
     #this can be sped up 
     def get_moves(self, position:PositionVector, curr_psi_dg:float,
-                  step_psi=5) -> list:
+                  current_theta_dg:float, step_psi=5) -> list:
         """
         based on current position and heading get all 
         possible forward moves
@@ -67,10 +67,15 @@ class FWAgent():
         
         moves = []
         ac_max_psi_dg = self.max_psi_turn_dg
+        ac_max_theta_dg = self.max_climb_angle_dg
 
-        max_z = 30
-        min_z = -30
-        step_z = 10
+        max_z = round(self.leg_m*np.sin(np.deg2rad(ac_max_theta_dg)))
+        min_z = round(self.leg_m*np.sin(np.deg2rad(-ac_max_theta_dg)))
+        step_z = 5
+
+        #round to nearest 5
+        max_z = max_z + (5 - max_z) % 5
+        min_z = min_z + (5 - min_z) % 5
 
         for i in range(0,ac_max_psi_dg+step_psi, step_psi):
             next_psi_dg = curr_psi_dg + i
@@ -82,9 +87,39 @@ class FWAgent():
             psi_rad = np.deg2rad(next_psi_dg)
             next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
             next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
-            for z in range(min_z, max_z+step_z, step_z):
-                next_z = position.z + z
-                moves.append([next_x, next_y, next_z])
+            
+            for theta in range(-ac_max_theta_dg, ac_max_theta_dg+step_psi, step_psi):
+                next_theta_dg = current_theta_dg + theta
+                
+                if next_theta_dg > 360:
+                    next_theta_dg -= 360
+                if next_theta_dg < 0:
+                    next_theta_dg += 360
+                    
+                theta_rad = np.deg2rad(next_theta_dg)
+
+            #     x = round(self.leg_m*(np.sin(theta_rad))*(np.cos(psi_rad)))
+            #     y = round(self.leg_m*(np.sin(theta_rad))*(np.sin(psi_rad)))
+            #     z = round(self.leg_m*(np.cos(theta_rad)))
+                
+            #     next_x = position.x + x
+            #     next_y = position.y + y
+            #     next_z = position.z + z
+            #     moves.append([next_x, next_y, next_z])
+                # next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))    
+                # next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
+                # next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
+                for z in range(min_z, max_z+step_z, step_z):
+                    next_z = position.z + z
+                    moves.append([next_x, next_y, next_z])
+            
+            # next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
+            # next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
+            # #this should not be z but the steps based on your climb angle
+            
+            # for z in range(min_z, max_z+step_z, step_z):
+            #     next_z = position.z + z
+            #     moves.append([next_x, next_y, next_z])
 
         for i in range(0,ac_max_psi_dg+step_psi, step_psi):
             next_psi_dg = curr_psi_dg - i
@@ -96,9 +131,30 @@ class FWAgent():
             psi_rad = np.deg2rad(next_psi_dg)
             next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
             next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
+
+            for theta in range(-ac_max_theta_dg, ac_max_theta_dg+step_psi, step_psi):
+                next_theta_dg = current_theta_dg + theta
+                
+                if next_theta_dg > 360:
+                    next_theta_dg -= 360
+                if next_theta_dg < 0:
+                    next_theta_dg += 360
+                    
+                theta_rad = np.deg2rad(next_theta_dg)
+
+                z = round(self.leg_m*(np.cos(theta_rad)))
+                
+            #     next_x = position.x + x
+            #     next_y = position.y + y
+                # next_z = position.z + z
+                # moves.append([next_x, next_y, next_z])
+            
+            # next_x = position.x + round(self.leg_m*(np.cos(psi_rad)))
+            # next_y = position.y + round(self.leg_m*(np.sin(psi_rad)))
             for z in range(min_z, max_z+step_z, step_z):
                 next_z = position.z + z
                 moves.append([next_x, next_y, next_z])
+            
         return moves
     
 

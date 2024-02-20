@@ -166,9 +166,10 @@ class SparseAstar():
         
         return True
         
-    def get_legal_moves(self, current_node:Node, psi_dg:float)-> list:
+    def get_legal_moves(self, current_node:Node, psi_dg:float, 
+                        theta_dg:float)-> list:
         """Get legal moves based on agent constraints"""
-        moves = self.agent.get_moves(current_node.position, psi_dg)
+        moves = self.agent.get_moves(current_node.position, psi_dg, theta_dg)
         legal_moves = []
 
         # need to scale moves based on grid size
@@ -243,6 +244,10 @@ class SparseAstar():
             dx = waypoints[i, 0] - waypoints[i-1, 0]
             dy = waypoints[i, 1] - waypoints[i-1, 1]
             psi_dg = np.rad2deg(np.arctan2(dy, dx))
+            dz = waypoints[i, 2] - waypoints[i-1, 2]
+            theta_dg = np.rad2deg(np.arctan2(dz, np.linalg.norm([dx, dy])))
+            waypoints[i-1, 3] = theta_dg
+            
             #want psi to point in the direction of the next waypoint
             waypoints[i-1, 5] = psi_dg
         
@@ -415,7 +420,7 @@ class SparseAstar():
                 return self.return_path(current_node)
 
             expanded_moves = self.get_legal_moves(
-                current_node, current_node.psi_dg)
+                current_node, current_node.psi_dg, current_node.theta_dg)
 
             if not expanded_moves:
                 continue

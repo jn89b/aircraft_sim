@@ -62,7 +62,7 @@ Q = np.diag([
     0.75, #u
     0.0, #w
     0.0, #q
-    0.0, #theta
+    1.0, #theta
     1.0, #h
     0.0, #x
     0.0, #v
@@ -361,6 +361,7 @@ for wp in rest_of_waypoints:
         
         if error >= approach_tolerance:
             new_psi = np.arctan2(dy,dx)
+            new_theta = np.arctan2(-dz, lateral_distance)
         else:
             print("Approaching the waypoint")
             new_psi = goal_psi

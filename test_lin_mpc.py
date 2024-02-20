@@ -280,7 +280,7 @@ for i in range(N):
             new_vel = 15.0
             new_w = 0.0
             new_q = 0.0
-            new_theta = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
+            new_theta = np.arctan2(dz, np.sqrt(dx**2 + dy**2))
             new_height = goal_h
             # new_x = 250
             new_v = 0.0
