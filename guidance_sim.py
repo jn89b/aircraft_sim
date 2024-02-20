@@ -61,7 +61,7 @@ if __name__ == '__main__':
     #load simple sim
     start_position = PositionVector(10,10,10)
     goal_position = PositionVector(400,450,15)
-    fw_agent_psi_dg = 30
+    fw_agent_psi_dg = 25
     fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
     fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
                                  max_climb_angle_dg=5,

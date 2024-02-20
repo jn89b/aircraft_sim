@@ -468,7 +468,7 @@ if __name__ == "__main__":
             dx = wp['x'] - planner_states.iloc[i-1]['x']
             dy = wp['y'] - planner_states.iloc[i-1]['y']
             planner_states.iloc[i-1]['psi_dg'] = np.rad2deg(np.arctan2(dy,dx))
-        
+
         location = [wp['x'], wp['y'], wp['z']]
         orientation = [np.deg2rad(wp['phi_dg']), np.deg2rad(wp['theta_dg']), np.deg2rad(wp['psi_dg'])]
         velocity = [max_speed, 0, 0]
@@ -476,33 +476,31 @@ if __name__ == "__main__":
         states.append(s)
         
     rest_of_states = states[2:]
-    current_state = states[0]
-
-        # planner_states.iloc[i] = wp
-
+    current_state  = states[0]
+    
     for wp in rest_of_states:
-        
-        distance_from_wp = np.sqrt((wp.location[0]-   current_state.location[0])**2 +
+    
+        distance_from_wp = np.sqrt( (wp.location[0] - current_state.location[0])**2 +
                                     (wp.location[1] - current_state.location[1])**2 +
                                     (wp.location[2] - current_state.location[2])**2)
-         
-        approach_tolerance = 15.0 
+               
+        approach_tolerance = 15.0
         dt = 0.05
-        # linearized_wp = convert_state_to_linearized(wp)    
+        # linearized_wp = convert_state_to_linearized(wp)
         print("going to waypoint: ", wp.location)
         print("\n")
         
         while distance_from_wp >= distance_tolerance:
-            goal_x = wp.location[0]
-            goal_y = wp.location[1]
-            goal_h = wp.location[2]    
-            dy = goal_y - current_lin_state[11]
-            dx = goal_x - current_lin_state[5]
-            dz = goal_h - current_lin_state[4]
+            goal_x  = wp.location[0]
+            goal_y  = wp.location[1]
+            goal_h  = wp.location[2]    
+            dy      = goal_y - current_lin_state[11]
+            dx      = goal_x - current_lin_state[5]
+            dz      = goal_h - current_lin_state[4]
             new_vel = 15.0
-            new_w = 0.0
-            new_q = 0.0
-            new_theta = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
+            new_w   = 0.0
+            new_q   = 0.0
+            new_theta  = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
             new_height = goal_h
             # new_x = 250
             new_v = 0.0

@@ -173,7 +173,6 @@ goal_p = 0
 goal_q = 0
 goal_r = 0
 
-
 goal_state = np.array([goal_u,
                           goal_w,
                           goal_q,
@@ -361,9 +360,9 @@ for i in range(N):
             
 
             #replace the position with the inertial position
-            start_state[5] = x_original
+            start_state[5]  = x_original
             start_state[11] = y_original
-            start_state[4] = z_original
+            start_state[4]  = z_original
 
             if add_noise == True:
                 start_state = add_noise_to_linear_states(start_state)
@@ -537,7 +536,7 @@ for i, wp in planner_states.iterrows():
     ax.quiver3D(wp['x'], wp['y'], -wp['z'],
                 np.cos(np.deg2rad(wp['psi_dg'])),
                 np.sin(np.deg2rad(wp['psi_dg'])),
-                np.sin(np.deg2rad(wp['theta_dg'])), length=20, color='k')
+                np.sin(np.deg2rad(wp['theta_dg'])), length=10, color='k')
 
 
 ax.legend()

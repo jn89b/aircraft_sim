@@ -239,7 +239,6 @@ for i in range(N):
         new_p = 0.0     
         new_r = 0.0
         new_phi = np.deg2rad(-45.0)
-        # new_psi = np.arctan2(dy,dx)
         new_y = 0.0
         goal_state = np.array([new_vel,
                                 new_w,
@@ -254,14 +253,10 @@ for i in range(N):
                                 new_psi,
                                 goal_y])
             
- 
         error = np.sqrt(dx**2 + dy**2 + dz**2)
-    
         print("new theta", np.rad2deg(new_theta))
         print("new psi", np.rad2deg(new_psi))
 
-    
-    
         lin_mpc.reinitStartGoal(start_state, goal_state)
         
         control_results, state_results = lin_mpc.solveMPCRealTimeStatic(
