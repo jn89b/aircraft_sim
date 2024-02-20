@@ -161,6 +161,7 @@ class ModelPredictiveControl():
                 'print_level': Config.PRINT_LEVEL,
                 'acceptable_tol': Config.ACCEPT_TOL,
                 'acceptable_obj_change_tol': Config.ACCEPT_OBJ_TOL,
+                'linear_solver': 'ma27'
                 # 'hessian_approximation': 'limited-memory',  # Set Hessian approximation method here
             },
             'print_time': Config.PRINT_TIME

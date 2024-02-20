@@ -234,9 +234,18 @@ class SparseAstar():
         waypoints = []
         for points in path:
             waypoints.append(points)
-            
+        
         #return states and waypoints as a dictionary
         waypoints = np.array(waypoints)
+        
+        #correct the waypoints heading
+        for i in range(1, len(waypoints)):
+            dx = waypoints[i, 0] - waypoints[i-1, 0]
+            dy = waypoints[i, 1] - waypoints[i-1, 1]
+            psi_dg = np.rad2deg(np.arctan2(dy, dx))
+            #want psi to point in the direction of the next waypoint
+            waypoints[i-1, 5] = psi_dg
+        
         return waypoints
 
 

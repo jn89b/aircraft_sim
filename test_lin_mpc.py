@@ -12,6 +12,7 @@ from src.math_lib.VectorOperations import euler_dcm_body_to_inertial, euler_dcm_
     compute_B_matrix
     
 from src.aircraft.AircraftDynamics import add_noise_to_linear_states
+plt.close('all')
 
 df = pd.read_csv("SIM_Plane_h_vals.csv")
 airplane_params = get_airplane_params(df)
@@ -42,8 +43,8 @@ goal_y = -110
 
 
 #weighting matrices for state
-Q = np.diag(
-[   1.0, #u
+Q = np.diag([
+    0.75, #u
     0.0, #w
     0.0, #q
     0.0, #theta
@@ -57,11 +58,12 @@ Q = np.diag(
     0.0, #y
 ])
 
+r_control = 0.4
 R = np.diag([
-    0.1, #delta_e
-    0.1, #delta_t
-    0.1, #delta_a
-    0.1, #delta_r
+    r_control, #delta_e
+    1.0, #delta_t
+    r_control, #delta_a
+    r_control, #delta_r
 ])
 
 mpc_params = {
@@ -95,12 +97,12 @@ lin_mpc_constraints = {
     'p_max': np.deg2rad(60),
     'r_min': np.deg2rad(-60),
     'r_max': np.deg2rad(60),
-    'phi_min': np.deg2rad(-60),
-    'phi_max': np.deg2rad(60)
+    'phi_min': np.deg2rad(-45),
+    'phi_max': np.deg2rad(45)
 }
 
 states = {
-    'u': 25,
+    'u': 15,
     'w': 0.0,
     'q': 0,
     'theta': np.deg2rad(-0.03),
@@ -142,6 +144,19 @@ start_control = np.array([controls['delta_e'],
 
 #load planner states
 planner_states = pd.read_csv("planner_states.csv")
+
+#recompute the planner states heading, I made a mistake in the planner
+#The heading should be the heading to the next waypoint  
+
+for i, wp in planner_states.iterrows():
+    if i == 0:
+        continue
+    else:
+        dx = wp['x'] - planner_states.iloc[i-1]['x']
+        dy = wp['y'] - planner_states.iloc[i-1]['y']
+        planner_states.iloc[i-1]['psi_dg'] = np.rad2deg(np.arctan2(dy,dx))
+        # planner_states.iloc[i] = wp
+
 idx_goal = 1
 
 #load up planner states
@@ -205,41 +220,41 @@ z_original = 0
 N = int(t_final/mpc_params['dt_val'])
 time_current = 0
 
-add_noise = True
+add_noise = False
 
-#tolerance 
-tolerance = 5.0
+#when aircraft approaches this tolerance, set to turnpoint heading
+approach_tolerance = 16.0
+tolerance = 8.0
 
 rest_waypoints = planner_states.iloc[idx_goal:,:]
 print("rest_waypoints: ", rest_waypoints)
 wp_max = len(rest_waypoints)
 
-#get first waypoint and set it as the goal
-wp = rest_waypoints.iloc[0,:]
-dy = goal_y - start_state[11]
-dx = goal_x - start_state[5]
-dz = goal_h - start_state[4]
-new_psi = np.arctan2(dy,dx)
+FINISHED = False
 for i in range(N):
     
-    # for i, wp in enumerate(rest_waypoints.iterrows()):
-        goal_x = wp['x']
-        goal_y = wp['y']
-        goal_h = wp['z']        
+    if FINISHED == True:
+        print("reached goal")
+        break
+
+    for j, wp in enumerate(rest_waypoints.iterrows()):
+        goal_x = wp[1]['x']
+        goal_y = wp[1]['y']
+        goal_h = wp[1]['z']        
         dy = goal_y - start_state[11]
         dx = goal_x - start_state[5]
         dz = goal_h - start_state[4]
-        new_vel = 15.0
+        new_vel = 25.0
         new_w = 0.0
         new_q = 0.0
-        new_theta = np.arctan2(dz, np.sqrt(dx**2 + dy**2))
+        new_theta = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
         new_height = goal_h
-        new_x = 250
+        # new_x = 250
         new_v = 0.0
         new_p = 0.0     
         new_r = 0.0
-        new_phi = np.deg2rad(-45.0)
-        # new_psi = np.arctan2(dy,dx)
+        new_phi = np.deg2rad(-55.0)
+        new_psi = np.arctan2(dy,dx)
         new_y = 0.0
         goal_state = np.array([new_vel,
                                 new_w,
@@ -253,86 +268,120 @@ for i in range(N):
                                 new_phi,
                                 new_psi,
                                 goal_y])
-            
- 
+
         error = np.sqrt(dx**2 + dy**2 + dz**2)
-    
-        print("new theta", np.rad2deg(new_theta))
-        print("new psi", np.rad2deg(new_psi))
-    
-    
-        lin_mpc.reinitStartGoal(start_state, goal_state)
         
-        control_results, state_results = lin_mpc.solveMPCRealTimeStatic(
-            start_state, goal_state, start_control)
-        
-        #unpack the results
-        control_results = lin_mpc.unpack_controls(control_results)
-        state_results = lin_mpc.unpack_states(state_results)
-        
-        start_state = np.array([state_results['u'][idx_start],
-                                state_results['w'][idx_start],
-                                state_results['q'][idx_start],
-                                state_results['theta'][idx_start],
-                                state_results['h'][idx_start],
-                                state_results['x'][idx_start],
-                                state_results['v'][idx_start],
-                                state_results['p'][idx_start],
-                                state_results['r'][idx_start],
-                                state_results['phi'][idx_start],
-                                state_results['psi'][idx_start],
-                                state_results['y'][idx_start]])
-        
-        start_control = np.array([control_results['delta_e'][idx_start],
-                                    control_results['delta_t'][idx_start],
-                                    control_results['delta_a'][idx_start],
-                                    control_results['delta_r'][idx_start]])
+        while error >= tolerance:
+            goal_x = wp[1]['x']
+            goal_y = wp[1]['y']
+            goal_h = wp[1]['z']        
+            dy = goal_y - start_state[11]
+            dx = goal_x - start_state[5]
+            dz = goal_h - start_state[4]
+            new_vel = 15.0
+            new_w = 0.0
+            new_q = 0.0
+            new_theta = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
+            new_height = goal_h
+            # new_x = 250
+            new_v = 0.0
+            new_p = 0.0     
+            new_r = 0.0
+            new_phi = np.deg2rad(0.0)
+            new_y = 0.0
             
-        #store the result in history
-        control_history.append(start_control)
-        state_history.append(start_state)
+            if error >= approach_tolerance:
+                new_psi = np.arctan2(dy,dx)
+            else:
+                new_psi = np.deg2rad(wp[1]['psi_dg'])
+                
+            goal_state = np.array([new_vel,
+                                    new_w,
+                                    new_q,
+                                    new_theta,
+                                    goal_h,
+                                    goal_x,
+                                    new_v,
+                                    new_p,
+                                    new_r,
+                                    new_phi,
+                                    new_psi,
+                                    goal_y])
         
-        R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
+            lin_mpc.reinitStartGoal(start_state, goal_state)
+            
+            control_results, state_results = lin_mpc.solveMPCRealTimeStatic(
+                start_state, goal_state, start_control)
+            
+            #unpack the results
+            control_results = lin_mpc.unpack_controls(control_results)
+            state_results = lin_mpc.unpack_states(state_results)
+            
+            start_state = np.array([state_results['u'][idx_start],
+                                    state_results['w'][idx_start],
+                                    state_results['q'][idx_start],
                                     state_results['theta'][idx_start],
-                                    state_results['psi'][idx_start])
-        
-        body_vel = np.array([state_results['u'][idx_start],
-                            state_results['v'][idx_start],
-                            state_results['w'][idx_start]])
-        
-        inertial_vel = np.matmul(R, body_vel)
-        inertial_pos = inertial_vel * mpc_params['dt_val']
-        
-        x_original = x_original + inertial_pos[0]
-        y_original = y_original + inertial_pos[1]
-        z_original = z_original + inertial_pos[2]
-        position_history.append(np.array([x_original, y_original, z_original]))    
-
-        state_position_history.append(np.array([state_results['x'][idx_start],
-                                                state_results['y'][idx_start],
-                                                state_results['h'][idx_start]]))
-        
-
-        #replace the position with the inertial position
-        start_state[5] = x_original
-        start_state[11] = y_original
-        start_state[4] = z_original
-
-        if add_noise == True:
-            start_state = add_noise_to_linear_states(start_state)
+                                    state_results['h'][idx_start],
+                                    state_results['x'][idx_start],
+                                    state_results['v'][idx_start],
+                                    state_results['p'][idx_start],
+                                    state_results['r'][idx_start],
+                                    state_results['phi'][idx_start],
+                                    state_results['psi'][idx_start],
+                                    state_results['y'][idx_start]])
             
-        #position_history.append(inertial_position)
-        goal_history.append(goal_state)
-        
-        time_current += mpc_params['dt_val']
-        
-        dy = goal_y - start_state[11]
-        dx = goal_x - start_state[5]
-        #dz = goal_h - start_state[4]
-        error = np.sqrt(dx**2 + dy**2)
-        print("error: ", error)
-        
-        if error <= tolerance:
+            start_control = np.array([control_results['delta_e'][idx_start],
+                                        control_results['delta_t'][idx_start],
+                                        control_results['delta_a'][idx_start],
+                                        control_results['delta_r'][idx_start]])
+                
+            #store the result in history
+            control_history.append(start_control)
+            state_history.append(start_state)
+            
+            R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
+                                        state_results['theta'][idx_start],
+                                        state_results['psi'][idx_start])
+            
+            body_vel = np.array([state_results['u'][idx_start],
+                                state_results['v'][idx_start],
+                                state_results['w'][idx_start]])
+            
+            inertial_vel = np.matmul(R, body_vel)
+            inertial_pos = inertial_vel * mpc_params['dt_val']
+            
+            x_original = x_original + inertial_pos[0]
+            y_original = y_original + inertial_pos[1]
+            z_original = z_original + inertial_pos[2]
+            position_history.append(np.array([x_original, y_original, z_original]))    
+
+            state_position_history.append(np.array([state_results['x'][idx_start],
+                                                    state_results['y'][idx_start],
+                                                    state_results['h'][idx_start]]))
+            
+
+            #replace the position with the inertial position
+            start_state[5] = x_original
+            start_state[11] = y_original
+            start_state[4] = z_original
+
+            if add_noise == True:
+                start_state = add_noise_to_linear_states(start_state)
+                
+            #position_history.append(inertial_position)
+            goal_history.append(goal_state)
+            
+            time_current += mpc_params['dt_val']
+            
+            dy = goal_y - start_state[11]
+            dx = goal_x - start_state[5]
+            dz = goal_h - start_state[4]
+            error = np.sqrt(dx**2 + dy**2 + dz**2)
+            # if error <= tolerance:
+            print("error: ", error)
+            
+        if j == wp_max - idx_start:
+            FINISHED = True
             break
 
 #%% 
@@ -485,10 +534,10 @@ ax.scatter(goal_x, goal_y, -goal_h, marker='o', label='goal position')
 
 #loop through the waypoints and plot the heading
 for i, wp in planner_states.iterrows():
-    ax.quiver3D(wp['x'], wp['y'], wp['z'],
+    ax.quiver3D(wp['x'], wp['y'], -wp['z'],
                 np.cos(np.deg2rad(wp['psi_dg'])),
                 np.sin(np.deg2rad(wp['psi_dg'])),
-                np.sin(np.deg2rad(wp['theta_dg'])), length=10, color='k')
+                np.sin(np.deg2rad(wp['theta_dg'])), length=20, color='k')
 
 
 ax.legend()

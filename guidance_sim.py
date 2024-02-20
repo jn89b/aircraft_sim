@@ -40,7 +40,6 @@ def load_pickle():
 
     return loaded_data
 
-
 def return_planner_states(self, states:list) ->pd.DataFrame:
     x = [state[0] for state in states]
     y = [state[1] for state in states]
@@ -60,31 +59,31 @@ def return_planner_states(self, states:list) ->pd.DataFrame:
 if __name__ == '__main__':
 
     #load simple sim
-    start_position = PositionVector(10,60,5)
-    goal_position = PositionVector(3500,1500, 10)
-    fw_agent_psi_dg = 45
+    start_position = PositionVector(10,10,10)
+    goal_position = PositionVector(400,450,15)
+    fw_agent_psi_dg = 30
     fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
     fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
                                  max_climb_angle_dg=5,
                                  max_psi_turn_dg=25)
-    fw_agent.leg_m = 40
+    fw_agent.leg_m = 25
 
     fw_agent.set_goal_state(goal_position)
 
     ## create grid
-    x_max = 5000
-    y_max = 6000
+    x_max = 500
+    y_max = 500
     grid = Grid(fw_agent, x_max, y_max, 100, 5, 5, 0)
     
     # obs_positions = [(40,60,10)]
 
     #set random seed
-    num_obstacles = 300
+    num_obstacles = 10
     np.random.seed(1)
     obs_positions = []
     for i in range(num_obstacles):
-        x = np.random.randint(500, 4500)
-        y = np.random.randint(500, 5000)
+        x = np.random.randint(150, 350)
+        y = np.random.randint(150, 350)
         z = np.random.randint(0, 100)
 
         #check if obstacle within 50m of start or goal
@@ -97,7 +96,7 @@ if __name__ == '__main__':
     obs_list = []
     for pos in obs_positions:
         obs_position = PositionVector(pos[0], pos[1], pos[2])
-        radius_obs_m = np.random.randint(30, 70)
+        radius_obs_m = np.random.randint(30, 40)
         some_obstacle = Obstacle(obs_position, radius_obs_m)
         obs_list.append(some_obstacle)
         grid.insert_obstacles(some_obstacle)

@@ -138,7 +138,16 @@ def convert_regular_states_to_lin(states:np.ndarray) -> np.ndarray:
          
     Returns the states modeled as linearized states :
         [u, 
-         w, q, theta, h, x, v, p, r, phi, psi, y]
+         w, 
+         q, 
+         theta, 
+         h, 
+         x, 
+         v, 
+         p, 
+         r, 
+         phi, 
+         psi, y]
         
     To do:
         - Have this use an index configuration to avoid confusion

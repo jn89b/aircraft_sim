@@ -53,7 +53,7 @@ if __name__=="__main__":
     #create a diagonal matrix for the weights
     Q = ca.diag([1.0,1.0,0.5, #position
                  0.0,0.0,0.0, #velocity body
-                 5.0,10.0,5.0, #euler angles
+                 1.0,1.0,2.0, #euler angles
                  0,0,0]) #angular rates body
 
     R = ca.diag([2.0,
@@ -161,7 +161,7 @@ if __name__=="__main__":
     t_init = 0.0
     t_final = 10
 
-    tolerance = 5
+    tolerance = 10
 
     max_iter = 1000
     counter = 0
@@ -222,7 +222,7 @@ if __name__=="__main__":
         error_mag = np.sqrt(error_x**2 + error_y**2 + error_z**2)
 
         while error_mag >= tolerance and counter <= max_iter:    
-
+            print("error_mag: ", error_mag)
             if error_mag <= tolerance:
                 print("Reached error_mag: ", error_mag)
 
@@ -396,7 +396,7 @@ if __name__=="__main__":
     ax[1].set_ylabel('delta_e (deg)')
     ax[1].legend()
     ax[2].plot(np.rad2deg(rk_controls['delta_r']), label='delta_r')
-    ax[2].set_ylabel('delta_r (deg)')
+    ax[2].set_ylabel('delta_r (deg)')5.0
     ax[2].legend()
     ax[3].plot(rk_controls['delta_t'], label='delta_t')
     ax[3].set_ylabel('delta_t (N)')
