@@ -316,12 +316,12 @@ def get_next_state(state_traj_results:dict,
                         control_traj_results['delta_r'][idx_start]])
     
     
-    R = euler_dcm_body_to_inertial(state_traj_results['phi'][idx_start],
-                                state_traj_results['theta'][idx_start],
-                                state_traj_results['psi'][idx_start])
-    body_vel = np.array([state_traj_results['u'][idx_start],
-                        state_traj_results['v'][idx_start],
-                        state_traj_results['w'][idx_start]])
+    # R = euler_dcm_body_to_inertial(state_traj_results['phi'][idx_start],
+    #                             state_traj_results['theta'][idx_start],
+    #                             state_traj_results['psi'][idx_start])
+    # body_vel = np.array([state_traj_results['u'][idx_start],
+    #                     state_traj_results['v'][idx_start],
+    #                     state_traj_results['w'][idx_start]])
     
     # inertial_vel = np.matmul(R, body_vel)
     
@@ -485,7 +485,6 @@ def load(
         |
         |
         ----> E(x)
-
         z is looking at you by hand right rule
     """
     
@@ -531,7 +530,11 @@ if __name__ == "__main__":
     starting_location: list[float] = [0, 0, -3]  # x, y, z where y is up, in meters
     starting_rotation: list[float] = [0, np.deg2rad(-0.03), np.deg2rad(45)]  # roll, pitch, yaw in radians
     starting_velocity: list[float] = [20, 0, 0]  # meters per second 
-    target_location: list[float] = [400, 450, -3]  # meters
+    target_location:   list[float] = [400, 450, -3] # meters
+    starting_controls: list[float] = [0,   #aileron in radians
+                                      0.1, #throttle in percent
+                                      0,   #elevator in radians
+                                      0]   #rudder in radians
     max_speed: float = 25  # meters per second
 
     ## Justin - To load the waypoints you're going to need to call the SAS function
@@ -568,6 +571,7 @@ if __name__ == "__main__":
     location = starting_location
     rotation = starting_rotation
     velocity = starting_velocity
+    controls = starting_controls 
     
     """
     This is where you would use your update function to update the state of the vehicle
@@ -588,99 +592,33 @@ if __name__ == "__main__":
     #     # if location == target_location:
     #     #     break
 
-    #we want to skip the first waypoint since this is our current state
-    rest_of_states    = states[1:]
-    current_state     = states[0]
-    current_lin_state = np.array([
-        current_state.velocity[0], #u
-        current_state.velocity[2], #w
-        0.0, #q
-        current_state.rotation[1], #theta
-        current_state.location[2], #h
-        current_state.location[0], #x
-        current_state.velocity[1], #v
-        0.0, #p
-        0.0, #r
-        current_state.rotation[0], #phi
-        current_state.rotation[2], #psi
-        current_state.location[1] #y
-    ])
-            
     current_state_history = []
-    counter = 0
-    counter_break = 200
-    dt = 0.05
-
-    #these are zeroed out reference whiles since we based on the linearized state
-    x_ref = 0
-    y_ref = 0
-    z_ref = 0
-    idx_start = 1
-    
-    rest_of_waypoints = states[1:]
-    current_state  = states[0]
-    
     approach_tolerance = 20
     distance_tolerance = 10
     
-    start_state = current_lin_state
+    counter = 0
+    counter_break = 200
+    dt = 0.05
+    idx_start = 1
     
-    # this is the initial state of the aircraft
-    states = {
-        'u': 20.0,
-        'w': 0.0,
-        'q': 0,
-        'theta': np.deg2rad(-0.03),
-        'h': -3.0,
-        'x': 0.0,
-        'v': 0.0,
-        'p': 0.0,
-        'r': 0.0,
-        'phi': 0.0,
-        'psi': np.deg2rad(45.0),
-        'y': 0.0,
-    }
-
-    start_state = np.array([states['u'],
-                            states['w'],
-                            states['q'],
-                            states['theta'],
-                            states['h'],
-                            states['x'],
-                            states['v'],
-                            states['p'],
-                            states['r'],
-                            states['phi'],
-                            states['psi'],
-                            states['y']])
-
-    # this is the initial control input
-    controls = {
-        'delta_e': np.deg2rad(0), #elevator in radians
-        'delta_t': 0.1, #throttle in percent
-        'delta_a': np.deg2rad(0), #aileron in radians
-        'delta_r': np.deg2rad(0), #rudder in radians
-    }
-
-    current_controls = np.array([controls['delta_e'],
-                                controls['delta_t'],
-                                controls['delta_a'],
-                                controls['delta_r']])
-        
+    #skip the first waypoint since this is the current state    
+    current_state  = states[0]
+    rest_of_waypoints = states[1:]
+    
+    ### Note this has to be a numpy array
+    start_state = convert_state_to_linearized(current_state)
+    controls = np.array(controls)
+  
     for wp in rest_of_waypoints:
         
         lateral_distance = compute_distance2D(wp.location, location)
         error = compute_distance3D(wp.location, location)
         
-        print("starting rotation", np.rad2deg(rotation[0]), 
-              np.rad2deg(rotation[1]), 
-              np.rad2deg(rotation[2]))
-        
         while error >= distance_tolerance:
         
             error = compute_distance3D(wp.location, 
                                        location)
-            
+    
             if error <= distance_tolerance:
                 print('reached waypoint')
                 break
@@ -690,11 +628,11 @@ if __name__ == "__main__":
                                                 approach_tolerance)
 
             state_results, control_results = get_trajectory(start_state, 
-                                                           current_controls,
+                                                           controls,
                                                            goal_state, 
                                                            aircraft_mpc)
 
-            start_state, current_controls = get_next_state(state_results,
+            start_state, controls = get_next_state(state_results,
                                                             control_results,
                                                             idx_start)
             
@@ -712,7 +650,6 @@ if __name__ == "__main__":
         if counter>=counter_break:
             break
 
-            
 # plot the current state history
 x = [state.location[0] for state in current_state_history]
 y = [state.location[1] for state in current_state_history]
@@ -723,9 +660,9 @@ ax = fig.add_subplot(111, projection='3d', label='trajectory')
 ax.plot(x, y, z, 'o-')
 
 #plot the waypoint
-ax.plot([state.location[0] for state in rest_of_states], 
-        [state.location[1] for state in rest_of_states], 
-        [state.location[2] for state in rest_of_states], 'o-', label='waypoints')
+ax.plot([state.location[0] for state in rest_of_waypoints], 
+        [state.location[1] for state in rest_of_waypoints], 
+        [state.location[2] for state in rest_of_waypoints], 'o-', label='waypoints')
 
 ax.legend()
 
