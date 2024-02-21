@@ -50,6 +50,19 @@ class Rotation:
         self.yaw = rotation[2]
 
 
+class Controls:
+    def __init__(self, elevator: float, throttle: float, aileron: float, rudder: float):
+        self.elevator = elevator # in radians
+        self.throttle = throttle # in percent 0-1
+        self.aileron = aileron   # in radians
+        self.rudder = rudder     # in radians
+
+    def __init__(self, control: list[float]):
+        self.elevator = control[0]
+        self.throttle = control[1]
+        self.aileron = control[2]
+        self.rudder = control[3]
+
 class State:
     location: list[float]  # x, y, z where y is up, in meters
     rotation: list[float]  # roll, pitch, yaw in radians
@@ -247,12 +260,17 @@ def load_mpc(aircraft_model:LinearizedAircraft,
     return lin_mpc
 
 def update(
-    location: list[float],  # x, y, z where y is up, in meters
-    rotation: list[float],  # roll, pitch, yaw in radians
-    velocity: list[float],  # meters per second
-    target_location: list[float],
-    dt: float,  # seconds
-) -> State:
+    location: list[float],   # x, y, z where y is up, in meters
+    rotation: list[float],   # roll, pitch, yaw in radians
+    velocity: list[float],   # meters per second
+    input_control:Controls, # the current control input
+    target_state: State,     # the waypoint as a state
+    mpc: LinearizedAircraftMPC,
+    approach_tol_m: float = 20,
+    idx_start: int = 1, #idx where the start state is in the trajectory
+    dt: float =0.05,  # seconds
+    
+) -> tuple:
     """
     afaict, the vectors need to be passed in as normal python objects from C#, 
     we can convert them to cleaner objects if you want, but it's not neccessary, 
@@ -262,8 +280,89 @@ def update(
     # rotation: Rotation = Rotation(rotation)
     # velocity: Vector3 = Vector3(velocity)
     # target_location: Vector3 = Vector3(target_location) -> the waypoint
+    dist_x = target_state.location[0] - location[0]
+    dist_y = target_state.location[1] - location[1]
+    dist_z = target_state.location[2] - location[2]
     
+    lateral_distance = m.sqrt(dist_x**2 + dist_y**2)
+    error = np.sqrt(dist_x**2 + dist_y**2 + dist_z**2)
+    
+    start_state_vec = convert_state_to_linearized(
+        State(location, rotation, velocity))
+    
+    if error>=approach_tol_m:
+        target_psi_rad = np.arctan2(dist_y, dist_x)
+        target_theta_rad = np.arctan2(-dist_z, lateral_distance)
+    else:
+        target_psi_rad = target_state.rotation[2]
+        
+    goal_state_vec = np.array([target_state.velocity[0], #u
+                            target_state.velocity[2], #w
+                            0.0, #q
+                            target_theta_rad, #theta
+                            target_state.location[2], #h
+                            target_state.location[0], #x
+                            target_state.velocity[1], #v
+                            0.0, #p
+                            0.0, #r
+                            target_state.rotation[0], #phi
+                            target_psi_rad, #psi
+                            target_state.location[1] #y
+                            ])
+    
+    mpc.reinitStartGoal(start_state_vec, goal_state_vec)
+    
+    current_controls_vec = np.array([input_control.elevator,
+                                input_control.throttle,
+                                input_control.aileron,
+                                input_control.rudder])
+    
+    u, x = mpc.solveMPCRealTimeStatic(start_state_vec, 
+                                      goal_state_vec, 
+                                      current_controls_vec)
+    
+    control_traj = mpc.unpack_controls(u)
+    state_traj = mpc.unpack_states(x)
 
+    start_state = np.array([state_traj['u'][idx_start],
+                            state_traj['w'][idx_start],
+                            state_traj['q'][idx_start],
+                            state_traj['theta'][idx_start],
+                            state_traj['h'][idx_start],
+                            state_traj['x'][idx_start],
+                            state_traj['v'][idx_start],
+                            state_traj['p'][idx_start],
+                            state_traj['r'][idx_start],
+                            state_traj['phi'][idx_start],
+                            state_traj['psi'][idx_start],
+                            state_traj['y'][idx_start]])
+    
+    control_output_vec = np.array([control_traj['delta_e'][idx_start],
+                            control_traj['delta_t'][idx_start],
+                            control_traj['delta_a'][idx_start],
+                            control_traj['delta_r'][idx_start]])
+    
+    # Need to go from body to inertial frame position to get 
+    # inertial velocity
+    R = euler_dcm_body_to_inertial(state_traj['phi'][idx_start],
+                                state_traj['theta'][idx_start],
+                                state_traj['psi'][idx_start])
+    body_vel = np.array([state_traj['u'][idx_start],
+                        state_traj['v'][idx_start],
+                        state_traj['w'][idx_start]])
+                        
+    inertial_vel = np.matmul(R, body_vel)
+    
+    location = [start_state[5], start_state[11], start_state[4]]
+    rotation = [start_state[9], start_state[3], start_state[10]]
+    velocity = [inertial_vel[0], inertial_vel[1], inertial_vel[2]]
+    
+    output_state = State(location, rotation, velocity)
+    output_control = Controls(control_output_vec)
+    
+    return output_state, output_control
+
+    
 def get_waypoint_states(path: list[list[float]], 
                         max_speed:float) -> list[State]:
     """
@@ -368,7 +467,7 @@ if __name__ == "__main__":
     starting_location: list[float] = [0, 0, -3]  # x, y, z where y is up, in meters
     starting_rotation: list[float] = [0, np.deg2rad(-0.03), np.deg2rad(45)]  # roll, pitch, yaw in radians
     starting_velocity: list[float] = [20, 0, 0]  # meters per second 
-    target_location: list[float] = [400, 450, 0]  # meters
+    target_location: list[float] = [400, 450, 20]  # meters
     max_speed: float = 25  # meters per second
 
     ## Justin - To load the waypoints you're going to need to call the SAS function
@@ -445,7 +544,7 @@ if __name__ == "__main__":
             
     current_state_history = []
     counter = 0
-    counter_break = 1000
+    counter_break = 500
     dt = 0.05
 
     #these are zeroed out reference whiles since we based on the linearized state
@@ -546,6 +645,7 @@ if __name__ == "__main__":
             error = np.sqrt(dx**2 + dy**2 + dz**2)
             
             if error <= distance_tolerance:
+                print('reached waypoint')
                 break            
             
             if error >= approach_tolerance:
@@ -587,7 +687,6 @@ if __name__ == "__main__":
                                     state_results['phi'][idx_start],
                                     state_results['psi'][idx_start],
                                     state_results['y'][idx_start]])
-            print("location: ", start_state[5], start_state[11], start_state[4])
 
             
             start_control = np.array([control_results['delta_e'][idx_start],
@@ -609,12 +708,6 @@ if __name__ == "__main__":
             x_ref = x_ref + inertial_pos[0]
             y_ref = y_ref + inertial_pos[1]
             z_ref = z_ref + inertial_pos[2]
-            
-            start_state[5]  =  x_ref + inertial_pos[0]
-            start_state[11] = y_ref + inertial_pos[1]
-            start_state[4]  =  z_ref + inertial_pos[2]
-            
-
             
             location = [start_state[5], start_state[11], start_state[4]]
             rotation = [state_results['phi'][idx_start],
