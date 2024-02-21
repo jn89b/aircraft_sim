@@ -306,6 +306,9 @@ for wp in rest_of_waypoints:
         new_psi = np.arctan2(dy,dx)
     else:
         new_psi = goal_psi
+        
+    print("starting rotation: ", np.rad2deg(start_state[9]), np.rad2deg(start_state[3]),
+            start_state[9])
 
     print("Moving to the next waypoint")
         
@@ -358,7 +361,6 @@ for wp in rest_of_waypoints:
         
         # error = np.sqrt(dx**2 + dy**2 + dz**2)
         lin_mpc.reinitStartGoal(start_state, goal_state)
-        print("goal_state: ", goal_state)
         control_results, state_results = lin_mpc.solveMPCRealTimeStatic(
             start_state, goal_state, current_controls)
         
@@ -378,7 +380,8 @@ for wp in rest_of_waypoints:
                                 state_results['psi'][idx_start],
                                 state_results['y'][idx_start]])
         print("location: ", start_state[5], start_state[11], start_state[4])
-        
+        print("rotation: ", np.rad2deg(start_state[9]), np.rad2deg(start_state[3]), 
+              np.rad2deg(start_state[9]))
         start_control = np.array([control_results['delta_e'][idx_start],
                                     control_results['delta_t'][idx_start],
                                     control_results['delta_a'][idx_start],
@@ -399,11 +402,11 @@ for wp in rest_of_waypoints:
         y_ref = y_ref + inertial_pos[1]
         z_ref = z_ref + inertial_pos[2]
         
-        start_state[5]  =  x_ref + inertial_pos[0]
-        start_state[11] = y_ref + inertial_pos[1]
-        start_state[4]  =  z_ref + inertial_pos[2]
+        # start_state[5]  =  x_ref + inertial_pos[0]
+        # start_state[11] = y_ref + inertial_pos[1]
+        # start_state[4]  =  z_ref + inertial_pos[2]
         
-        
+        print("control: ", start_control)
         current_state_history.append(start_state)
         counter += 1
         
