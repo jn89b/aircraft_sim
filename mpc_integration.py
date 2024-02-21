@@ -605,119 +605,142 @@ if __name__ == "__main__":
     
     for wp in rest_of_waypoints:
         
-        goal_x = wp.location[0]
-        goal_y = wp.location[1]
-        goal_z = wp.location[2]
-        goal_psi = wp.rotation[2]
-        dx     = goal_x - start_state[5]
-        dy     = goal_y - start_state[11]
-        dz     = goal_z - start_state[4]
-        lateral_distance = np.sqrt(dx**2 + dy**2)
+        # goal_x = wp.location[0]
+        # goal_y = wp.location[1]
+        # goal_z = wp.location[2]
+        # goal_psi = wp.rotation[2]
+        # dx     = goal_x - start_state[5]
+        # dy     = goal_y - start_state[11]
+        # dz     = goal_z - start_state[4]
+        # lateral_distance = np.sqrt(dx**2 + dy**2)
         
-        error = np.sqrt(dx**2 + dy**2 + dz**2)
+        # error = np.sqrt(dx**2 + dy**2 + dz**2)
             
-        if error >= approach_tolerance:
-            new_psi = np.arctan2(dy,dx)
-        else:
-            new_psi = goal_psi
+        # if error >= approach_tolerance:
+        #     new_psi = np.arctan2(dy,dx)
+        # else:
+        #     new_psi = goal_psi
+        
+        dx = goal_x - location[0]
+        dy = goal_y - location[1]
+        dz = goal_z - location[2]
+        lateral_distance = m.sqrt(dx**2 + dy**2)
+        error = np.sqrt(dx**2 + dy**2 + dz**2)
                         
         while error >= distance_tolerance:
-            goal_x = wp.location[0]
-            goal_y = wp.location[1]
-            goal_z = wp.location[2]
-            dx     = goal_x - start_state[5]
-            dy     = goal_y - start_state[11] 
-            dz     = goal_z - start_state[4]
-            lateral_distance = np.sqrt(dx**2 + dy**2)
+            # goal_x = wp.location[0]
+            # goal_y = wp.location[1]
+            # goal_z = wp.location[2]
+            # dx     = goal_x - start_state[5]
+            # dy     = goal_y - start_state[11] 
+            # dz     = goal_z - start_state[4]
+            # lateral_distance = np.sqrt(dx**2 + dy**2)
             
-            new_vel = 15
-            new_w = 0.0
-            new_q = 0.0
-            new_theta = np.arctan2(-dz, lateral_distance)
-            # new_x = 250
-            new_v = 0.0
-            new_p = 0.0     
-            new_r = 0.0
-            new_phi = np.deg2rad(0.0)
-            new_psi = np.arctan2(dy,dx)
-            new_y = 0.0
-            
-            error = np.sqrt(dx**2 + dy**2 + dz**2)
-            
-            if error <= distance_tolerance:
-                print('reached waypoint')
-                break            
-            
-            if error >= approach_tolerance:
-                new_psi = np.arctan2(dy,dx)
-                new_theta = np.arctan2(-dz, lateral_distance)
-            else:
-                new_psi = goal_psi
-
-            goal_state = np.array([new_vel,
-                                    new_w,
-                                    new_q,
-                                    new_theta,
-                                    goal_z,
-                                    goal_x,
-                                    new_v,
-                                    new_p,
-                                    new_r,
-                                    new_phi,
-                                    new_psi,
-                                    new_y])
+            # new_vel = 15
+            # new_w = 0.0
+            # new_q = 0.0
+            # new_theta = np.arctan2(-dz, lateral_distance)
+            # # new_x = 250
+            # new_v = 0.0
+            # new_p = 0.0     
+            # new_r = 0.0
+            # new_phi = np.deg2rad(0.0)
+            # new_psi = np.arctan2(dy,dx)
+            # new_y = 0.0
             
             # error = np.sqrt(dx**2 + dy**2 + dz**2)
-            aircraft_mpc.reinitStartGoal(start_state, goal_state)
-            control_results, state_results = aircraft_mpc.solveMPCRealTimeStatic(
-                start_state, goal_state, current_controls)
             
-            control_results = aircraft_mpc.unpack_controls(control_results)
-            state_results = aircraft_mpc.unpack_states(state_results)
+            # if error <= distance_tolerance:
+            #     print('reached waypoint')
+            #     break            
             
-            start_state = np.array([state_results['u'][idx_start],
-                                    state_results['w'][idx_start],
-                                    state_results['q'][idx_start],
-                                    state_results['theta'][idx_start],
-                                    state_results['h'][idx_start],
-                                    state_results['x'][idx_start],
-                                    state_results['v'][idx_start],
-                                    state_results['p'][idx_start],
-                                    state_results['r'][idx_start],
-                                    state_results['phi'][idx_start],
-                                    state_results['psi'][idx_start],
-                                    state_results['y'][idx_start]])
+            # if error >= approach_tolerance:
+            #     new_psi = np.arctan2(dy,dx)
+            #     new_theta = np.arctan2(-dz, lateral_distance)
+            # else:
+            #     new_psi = goal_psi
+
+            # goal_state = np.array([new_vel,
+            #                         new_w,
+            #                         new_q,
+            #                         new_theta,
+            #                         goal_z,
+            #                         goal_x,
+            #                         new_v,
+            #                         new_p,
+            #                         new_r,
+            #                         new_phi,
+            #                         new_psi,
+            #                         new_y])
+            
+            # # error = np.sqrt(dx**2 + dy**2 + dz**2)
+            # aircraft_mpc.reinitStartGoal(start_state, goal_state)
+            # control_results, state_results = aircraft_mpc.solveMPCRealTimeStatic(
+            #     start_state, goal_state, current_controls)
+            
+            # control_results = aircraft_mpc.unpack_controls(control_results)
+            # state_results = aircraft_mpc.unpack_states(state_results)
+            
+            # start_state = np.array([state_results['u'][idx_start],
+            #                         state_results['w'][idx_start],
+            #                         state_results['q'][idx_start],
+            #                         state_results['theta'][idx_start],
+            #                         state_results['h'][idx_start],
+            #                         state_results['x'][idx_start],
+            #                         state_results['v'][idx_start],
+            #                         state_results['p'][idx_start],
+            #                         state_results['r'][idx_start],
+            #                         state_results['phi'][idx_start],
+            #                         state_results['psi'][idx_start],
+            #                         state_results['y'][idx_start]])
 
             
-            start_control = np.array([control_results['delta_e'][idx_start],
-                                        control_results['delta_t'][idx_start],
-                                        control_results['delta_a'][idx_start],
-                                        control_results['delta_r'][idx_start]])
+            # start_control = np.array([control_results['delta_e'][idx_start],
+            #                             control_results['delta_t'][idx_start],
+            #                             control_results['delta_a'][idx_start],
+            #                             control_results['delta_r'][idx_start]])
             
-            # Need to go from body to inertial frame position
-            R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
-                                        state_results['theta'][idx_start],
-                                        state_results['psi'][idx_start])
-            body_vel = np.array([state_results['u'][idx_start],
-                                state_results['v'][idx_start],
-                                state_results['w'][idx_start]])
+            # # Need to go from body to inertial frame position
+            # R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
+            #                             state_results['theta'][idx_start],
+            #                             state_results['psi'][idx_start])
+            # body_vel = np.array([state_results['u'][idx_start],
+            #                     state_results['v'][idx_start],
+            #                     state_results['w'][idx_start]])
 
-            inertial_vel = np.matmul(R, body_vel)
-            inertial_pos = inertial_vel * 0.05
+            # inertial_vel = np.matmul(R, body_vel)
+            # inertial_pos = inertial_vel * 0.05
             
-            x_ref = x_ref + inertial_pos[0]
-            y_ref = y_ref + inertial_pos[1]
-            z_ref = z_ref + inertial_pos[2]
+            # x_ref = x_ref + inertial_pos[0]
+            # y_ref = y_ref + inertial_pos[1]
+            # z_ref = z_ref + inertial_pos[2]
             
-            location = [start_state[5], start_state[11], start_state[4]]
-            rotation = [state_results['phi'][idx_start],
-                        state_results['theta'][idx_start],
-                        state_results['psi'][idx_start]]
-            velocity = [inertial_vel[0], inertial_vel[1], inertial_vel[2]]
+            # location = [start_state[5], start_state[11], start_state[4]]
+            # rotation = [state_results['phi'][idx_start],
+            #             state_results['theta'][idx_start],
+            #             state_results['psi'][idx_start]]
+            # velocity = [inertial_vel[0], inertial_vel[1], inertial_vel[2]]
+            #sim_state = State(location, rotation, velocity)
             
-            sim_state = State(location, rotation, velocity)
+            output_state, output_control = update(
+                location=location,
+                rotation=rotation,
+                velocity=velocity,
+                input_control=Controls(current_controls),
+                target_state=wp,
+                mpc=aircraft_mpc,
+                approach_tol_m=approach_tolerance,
+                idx_start=idx_start,
+                dt=0.05
+            )
             
-            current_state_history.append(sim_state)
+            location = output_state.location
+            rotation = output_state.rotation
+            velocity = output_state.velocity
+            current_controls = output_control
+            
+            
+            current_state_history.append(output_state)
             counter += 1
             
             if counter >= counter_break:
