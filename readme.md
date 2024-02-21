@@ -11,7 +11,22 @@ This project is a comprehensive simulation for aircraft dynamics and control. It
 - Extensive documentation and tests
 
 ## Installation
-Provide instructions on how to clone, set up, and install any dependencies for the project.
+### Run Virtual environment
+First initialize your virtual environment 
+
+```
+python3 -m venv venv
+```
+Once done you can use the bash script to activate your virtual environment using the following command
+
+```
+source run_venv.sh
+```
+
+### Python dependencies
+```
+pip install -r requirements.txt
+```
 
 ## Usage
 Explain how to run the main scripts and any configurations or settings that can be adjusted.
