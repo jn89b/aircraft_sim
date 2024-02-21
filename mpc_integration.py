@@ -25,11 +25,6 @@ from src.Utils import read_lon_matrices, get_airplane_params
 from src.aircraft.AircraftDynamics import LinearizedAircraft, LinearizedAircraftCasadi
 from src.mpc.FixedWingMPC import LinearizedAircraftMPC
 
-def rad_to_deg(rad: float) -> float:
-    return rad * (180 / 3.14159)
-
-def deg_to_rad(deg: float) -> float:
-    return deg * (3.14159 / 180)
 
 class Vector3:
     def __init__(self, x: float, y: float, z: float):
@@ -126,7 +121,7 @@ def convert_linearized_to_state(linearized_state: np.array) -> State:
     This function converts the state space representation to the state of the aircraft
     Since the State class is in the ENU convention, we need to convert it to the NED convention
     """
-    states = np.array([linearized_state[5], #x   
+    sim_states = np.array([linearized_state[5], #x   
                      linearized_state[11], #y 
                      linearized_state[4], #z
                      linearized_state[0], #u
@@ -138,15 +133,13 @@ def convert_linearized_to_state(linearized_state: np.array) -> State:
                      linearized_state[7], #p
                      linearized_state[2], #q
                      linearized_state[8]]) #r
-    
-    location = [states[0], states[1], -states[2]]
-    rotation = [states[6], states[7], -states[10]]
-    velocity = [states[3], states[4], states[5]]
-    
-    return State(location, rotation, velocity)
-    
 
-        
+    sim_loc = [sim_states[0], sim_states[1], sim_states[2]]
+    sim_rot = [sim_states[6], sim_states[7], sim_states[8]]
+    sim_vel = [sim_states[3], sim_states[4], states[5]]
+    
+    return State(sim_loc, sim_rot, sim_vel)
+           
 def load_linearized_model() -> LinearizedAircraftCasadi:
     """
     This loads the linearized model of the aircraft for use in the MPC
@@ -210,8 +203,9 @@ def load_mpc(aircraft_model:LinearizedAircraft,
         'R': R, #control weighting matrix
     }
 
-    # this are the constrints we give to our controller
-    # you can make this a parameter if you want 
+    # these are the state and control constraints we give to our controller
+    # you can make this a parameter if you want, I don't recomend you do this
+    # since the constraints are specific to the aircraft
     lin_mpc_constraints = {
         'delta_e_min': np.deg2rad(-30),
         'delta_e_max': np.deg2rad(30),
@@ -229,8 +223,8 @@ def load_mpc(aircraft_model:LinearizedAircraft,
         'q_max': np.deg2rad(60),
         'theta_min': np.deg2rad(-35),
         'theta_max': np.deg2rad(35),
-        'v_min': 15, #don't need this really
-        'v_max': 35,  #don't need this really
+        'v_min': -35, 
+        'v_max': 35,  
         'p_min': np.deg2rad(-60),
         'p_max': np.deg2rad(60),
         'r_min': np.deg2rad(-60),
@@ -296,8 +290,8 @@ def load(
     target_location: list[float],
     max_speed: float,
     max_yaw_turn_dg: float = 25,
-    max_climb_angle_dg: float = 10,
-    leg_m:float = 100,
+    max_climb_angle_dg: float = 15,
+    leg_m:float = 30,
     x_bounds: list[float] = [0, 500], 
     y_bounds: list[float] = [0, 500],
     z_bounds: list[float] = [0, 500],
@@ -338,8 +332,8 @@ def load(
     start_position = PositionVector(location[0], 
                                     location[1], 
                                     location[2])
-    pitch_dg = rad_to_deg(rotation[1])
-    yaw_dg   = rad_to_deg(rotation[2])
+    pitch_dg = np.rad2deg(rotation[1])
+    yaw_dg   = np.rad2deg(rotation[2])
     
     fw_agent = FWAgent(start_position, pitch_dg, yaw_dg)
     fw_agent.vehicle_constraints(max_climb_angle_dg=max_climb_angle_dg,
@@ -371,10 +365,10 @@ def load(
 
 if __name__ == "__main__":
     
-    starting_location: list[float] = [20, 20, 0]  # x, y, z where y is up, in meters
-    starting_rotation: list[float] = [0, 0, np.deg2rad(45)]  # roll, pitch, yaw in radians
-    starting_velocity: list[float] = [15, 0, 0]  # meters per second 
-    target_location: list[float] = [300, 290, 0]  # meters
+    starting_location: list[float] = [0, 0, -3]  # x, y, z where y is up, in meters
+    starting_rotation: list[float] = [0, np.deg2rad(-0.03), np.deg2rad(45)]  # roll, pitch, yaw in radians
+    starting_velocity: list[float] = [20, 0, 0]  # meters per second 
+    target_location: list[float] = [400, 450, 0]  # meters
     max_speed: float = 25  # meters per second
 
     ## Justin - To load the waypoints you're going to need to call the SAS function
@@ -385,7 +379,7 @@ if __name__ == "__main__":
         velocity=starting_velocity,
         target_location=target_location,
         max_speed=15,
-        leg_m=40,
+        leg_m=30,
     )
     
     ## Justin - You're going to need instantiate the MPC here
@@ -430,116 +424,158 @@ if __name__ == "__main__":
     #     #you should have a tolerance check here, but I'm not sure what that would be
     #     # if location == target_location:
     #     #     break
-    
-    distance_tolerance = 10.0 #meters
-    approach_tolerance = 25.0
-    
+
     #we want to skip the first waypoint since this is our current state
-    rest_of_states    = states[2:]
+    rest_of_states    = states[1:]
     current_state     = states[0]
-    current_lin_state = convert_state_to_linearized(states[0])
-    
-    print("current state: ", current_lin_state)
-    #set this to an initial value
-    current_controls = np.array([0,
-                                 0.1,
-                                 0.0,
-                                 0])
-    
+    current_lin_state = np.array([
+        current_state.velocity[0], #u
+        current_state.velocity[2], #w
+        0.0, #q
+        current_state.rotation[1], #theta
+        current_state.location[2], #h
+        current_state.location[0], #x
+        current_state.velocity[1], #v
+        0.0, #p
+        0.0, #r
+        current_state.rotation[0], #phi
+        current_state.rotation[2], #psi
+        current_state.location[1] #y
+    ])
+            
     current_state_history = []
     counter = 0
-    counter_break = 100
+    counter_break = 1000
+    dt = 0.05
 
-    x_original = current_state.location[0]
-    y_original = current_state.location[1]
-    z_original = current_state.location[2]
-        
-    # Load the waypoints and test if this shit works 
-    planner_states = pd.read_csv("planner_states.csv")
-
-    #recompute the planner states heading, I made a mistake in the planner
-    #The heading should be the heading to the next waypoint  
-
-    states = []
-    for i, wp in planner_states.iterrows():
-        if i == 0:
-            continue
-        else:
-            dx = wp['x'] - planner_states.iloc[i-1]['x']
-            dy = wp['y'] - planner_states.iloc[i-1]['y']
-            planner_states.iloc[i-1]['psi_dg'] = np.rad2deg(np.arctan2(dy,dx))
-
-        location = [wp['x'], wp['y'], wp['z']]
-        orientation = [np.deg2rad(wp['phi_dg']), np.deg2rad(wp['theta_dg']), np.deg2rad(wp['psi_dg'])]
-        velocity = [max_speed, 0, 0]
-        s = State(location, orientation, velocity)
-        states.append(s)
-        
-    rest_of_states = states[2:]
+    #these are zeroed out reference whiles since we based on the linearized state
+    x_ref = 0
+    y_ref = 0
+    z_ref = 0
+    idx_start = 1
+    
+    rest_of_waypoints = states[1:]
     current_state  = states[0]
     
-    for wp in rest_of_states:
+    approach_tolerance = 20
+    distance_tolerance = 10
     
-        distance_from_wp = np.sqrt( (wp.location[0] - current_state.location[0])**2 +
-                                    (wp.location[1] - current_state.location[1])**2 +
-                                    (wp.location[2] - current_state.location[2])**2)
-               
-        approach_tolerance = 15.0
-        dt = 0.05
-        # linearized_wp = convert_state_to_linearized(wp)
-        print("going to waypoint: ", wp.location)
-        print("\n")
+    start_state = current_lin_state
+    
+    # this is the initial state of the aircraft
+    states = {
+        'u': 20.0,
+        'w': 0.0,
+        'q': 0,
+        'theta': np.deg2rad(-0.03),
+        'h': -3.0,
+        'x': 0.0,
+        'v': 0.0,
+        'p': 0.0,
+        'r': 0.0,
+        'phi': 0.0,
+        'psi': np.deg2rad(45.0),
+        'y': 0.0,
+    }
+
+    start_state = np.array([states['u'],
+                            states['w'],
+                            states['q'],
+                            states['theta'],
+                            states['h'],
+                            states['x'],
+                            states['v'],
+                            states['p'],
+                            states['r'],
+                            states['phi'],
+                            states['psi'],
+                            states['y']])
+
+    # this is the initial control input
+    controls = {
+        'delta_e': np.deg2rad(0), #elevator in radians
+        'delta_t': 0.1, #throttle in percent
+        'delta_a': np.deg2rad(0), #aileron in radians
+        'delta_r': np.deg2rad(0), #rudder in radians
+    }
+
+    current_controls = np.array([controls['delta_e'],
+                                controls['delta_t'],
+                                controls['delta_a'],
+                                controls['delta_r']])
+    
+    for wp in rest_of_waypoints:
         
-        while distance_from_wp >= distance_tolerance:
-            goal_x  = wp.location[0]
-            goal_y  = wp.location[1]
-            goal_h  = wp.location[2]    
-            dy      = goal_y - current_lin_state[11]
-            dx      = goal_x - current_lin_state[5]
-            dz      = goal_h - current_lin_state[4]
-            new_vel = 15.0
-            new_w   = 0.0
-            new_q   = 0.0
-            new_theta  = np.arctan2(-dz, np.sqrt(dx**2 + dy**2))
-            new_height = goal_h
+        goal_x = wp.location[0]
+        goal_y = wp.location[1]
+        goal_z = wp.location[2]
+        goal_psi = wp.rotation[2]
+        dx     = goal_x - start_state[5]
+        dy     = goal_y - start_state[11]
+        dz     = goal_z - start_state[4]
+        lateral_distance = np.sqrt(dx**2 + dy**2)
+        
+        error = np.sqrt(dx**2 + dy**2 + dz**2)
+            
+        if error >= approach_tolerance:
+            new_psi = np.arctan2(dy,dx)
+        else:
+            new_psi = goal_psi
+                        
+        while error >= distance_tolerance:
+            goal_x = wp.location[0]
+            goal_y = wp.location[1]
+            goal_z = wp.location[2]
+            dx     = goal_x - start_state[5]
+            dy     = goal_y - start_state[11] 
+            dz     = goal_z - start_state[4]
+            lateral_distance = np.sqrt(dx**2 + dy**2)
+            
+            new_vel = 15
+            new_w = 0.0
+            new_q = 0.0
+            new_theta = np.arctan2(-dz, lateral_distance)
             # new_x = 250
             new_v = 0.0
             new_p = 0.0     
             new_r = 0.0
             new_phi = np.deg2rad(0.0)
+            new_psi = np.arctan2(dy,dx)
             new_y = 0.0
             
-            if distance_from_wp >= approach_tolerance:
+            error = np.sqrt(dx**2 + dy**2 + dz**2)
+            
+            if error <= distance_tolerance:
+                break            
+            
+            if error >= approach_tolerance:
                 new_psi = np.arctan2(dy,dx)
-            # else:
-            #     new_psi = wp.rotation[2]
-                
-            print("desired psi: ", np.rad2deg(new_psi))
-            print("current psi: ", np.rad2deg(current_lin_state[10]))
-                
+                new_theta = np.arctan2(-dz, lateral_distance)
+            else:
+                new_psi = goal_psi
+
             goal_state = np.array([new_vel,
                                     new_w,
                                     new_q,
                                     new_theta,
-                                    goal_h,
+                                    goal_z,
                                     goal_x,
                                     new_v,
                                     new_p,
                                     new_r,
                                     new_phi,
                                     new_psi,
-                                    goal_y])
-        
-            aircraft_mpc.reinitStartGoal(current_lin_state, goal_state)
+                                    new_y])
             
+            # error = np.sqrt(dx**2 + dy**2 + dz**2)
+            aircraft_mpc.reinitStartGoal(start_state, goal_state)
             control_results, state_results = aircraft_mpc.solveMPCRealTimeStatic(
-                current_lin_state, goal_state, current_controls)
+                start_state, goal_state, current_controls)
             
-            #unpack the results
             control_results = aircraft_mpc.unpack_controls(control_results)
             state_results = aircraft_mpc.unpack_states(state_results)
-            idx_start = 1
-            current_lin_state = np.array([state_results['u'][idx_start],
+            
+            start_state = np.array([state_results['u'][idx_start],
                                     state_results['w'][idx_start],
                                     state_results['q'][idx_start],
                                     state_results['theta'][idx_start],
@@ -551,48 +587,52 @@ if __name__ == "__main__":
                                     state_results['phi'][idx_start],
                                     state_results['psi'][idx_start],
                                     state_results['y'][idx_start]])
+            print("location: ", start_state[5], start_state[11], start_state[4])
+
             
-            current_controls = np.array([control_results['delta_e'][idx_start],
+            start_control = np.array([control_results['delta_e'][idx_start],
                                         control_results['delta_t'][idx_start],
                                         control_results['delta_a'][idx_start],
                                         control_results['delta_r'][idx_start]])
-                
+            
+            # Need to go from body to inertial frame position
             R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
                                         state_results['theta'][idx_start],
                                         state_results['psi'][idx_start])
-            
             body_vel = np.array([state_results['u'][idx_start],
                                 state_results['v'][idx_start],
                                 state_results['w'][idx_start]])
-            
+
             inertial_vel = np.matmul(R, body_vel)
             inertial_pos = inertial_vel * 0.05
             
-            x_original = x_original + inertial_pos[0]
-            y_original = y_original + inertial_pos[1]
-            #z_original = z_original  inertial_pos[2]
+            x_ref = x_ref + inertial_pos[0]
+            y_ref = y_ref + inertial_pos[1]
+            z_ref = z_ref + inertial_pos[2]
+            
+            start_state[5]  =  x_ref + inertial_pos[0]
+            start_state[11] = y_ref + inertial_pos[1]
+            start_state[4]  =  z_ref + inertial_pos[2]
+            
 
-            #replace the position with the inertial position
-            current_lin_state[5] = x_original
-            current_lin_state[11] = y_original
-            current_lin_state[4] = z_original
             
-            dx = goal_x - current_lin_state[5]
-            dy = goal_y - current_lin_state[11]
-            dz = goal_h - current_lin_state[4]
+            location = [start_state[5], start_state[11], start_state[4]]
+            rotation = [state_results['phi'][idx_start],
+                        state_results['theta'][idx_start],
+                        state_results['psi'][idx_start]]
+            velocity = [inertial_vel[0], inertial_vel[1], inertial_vel[2]]
             
-            distance_from_wp = np.sqrt(dx**2 + dy**2 + dz**2)
-            print("Distance from waypoint: ", distance_from_wp)
+            sim_state = State(location, rotation, velocity)
             
+            current_state_history.append(sim_state)
             counter += 1
-            if counter > counter_break:
+            
+            if counter >= counter_break:
                 break
             
-            current_state = convert_linearized_to_state(current_lin_state)
-            current_state_history.append(current_state)
-        
-        if counter > counter_break:
+        if counter>=counter_break:
             break
+
             
 # plot the current state history
 x = [state.location[0] for state in current_state_history]
@@ -604,9 +644,9 @@ ax = fig.add_subplot(111, projection='3d', label='trajectory')
 ax.plot(x, y, z, 'o-')
 
 #plot the waypoint
-ax.plot([state.location[0] for state in states], 
-        [state.location[1] for state in states], 
-        [state.location[2] for state in states], 'o-', label='waypoints')
+ax.plot([state.location[0] for state in rest_of_states], 
+        [state.location[1] for state in rest_of_states], 
+        [state.location[2] for state in rest_of_states], 'o-', label='waypoints')
 
 ax.legend()
 

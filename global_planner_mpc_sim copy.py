@@ -208,7 +208,7 @@ state_results = lin_mpc.unpack_states(state_results)
 #load simple sim
 #start_position = PositionVector(,10,0)
 start_position = PositionVector(start_state[5], start_state[11], start_state[4])
-goal_position = PositionVector(400,450,start_state[4])
+goal_position = PositionVector(400,450,start_state[4]+40)
 fw_agent_psi_dg = 30
 fw_agent = FWAgent(start_position, 0, fw_agent_psi_dg)
 fw_agent.vehicle_constraints(horizontal_min_radius_m=60, 
@@ -226,7 +226,7 @@ grid = Grid(fw_agent, x_max, y_max, 100, 5, 5, 0)
 # obs_positions = [(40,60,10)]
 
 #set random seed
-num_obstacles = 0
+num_obstacles = 10
 np.random.seed(1)
 obs_positions = []
 for i in range(num_obstacles):
@@ -268,7 +268,7 @@ for i in range(len(path)):
     waypoints.append(state)
     
 distance_tolerance = 10
-approach_tolerance = 20
+approach_tolerance = 15
 
 rest_of_waypoints = waypoints[1:]
 current_waypoint  = waypoints[0]
@@ -284,11 +284,10 @@ y_ref = 0
 z_ref = 0
 
 counter = 0
-counter_break = 2
+counter_break = 1000
 idx_start = 1
 velocity = 15
 
-print(start_state)
 for wp in rest_of_waypoints:
     
     goal_x = wp.position[0]
@@ -357,8 +356,8 @@ for wp in rest_of_waypoints:
                                 new_y])
         
         # error = np.sqrt(dx**2 + dy**2 + dz**2)
+        
         lin_mpc.reinitStartGoal(start_state, goal_state)
-        print("goal_state: ", goal_state)
         control_results, state_results = lin_mpc.solveMPCRealTimeStatic(
             start_state, goal_state, current_controls)
         
@@ -377,7 +376,6 @@ for wp in rest_of_waypoints:
                                 state_results['phi'][idx_start],
                                 state_results['psi'][idx_start],
                                 state_results['y'][idx_start]])
-        print("location: ", start_state[5], start_state[11], start_state[4])
         
         start_control = np.array([control_results['delta_e'][idx_start],
                                     control_results['delta_t'][idx_start],
@@ -388,10 +386,11 @@ for wp in rest_of_waypoints:
         R = euler_dcm_body_to_inertial(state_results['phi'][idx_start],
                                     state_results['theta'][idx_start],
                                     state_results['psi'][idx_start])
+        
         body_vel = np.array([state_results['u'][idx_start],
                             state_results['v'][idx_start],
                             state_results['w'][idx_start]])
-                
+        
         inertial_vel = np.matmul(R, body_vel)
         inertial_pos = inertial_vel * mpc_params['dt_val']   
         
@@ -402,7 +401,6 @@ for wp in rest_of_waypoints:
         start_state[5]  =  x_ref + inertial_pos[0]
         start_state[11] = y_ref + inertial_pos[1]
         start_state[4]  =  z_ref + inertial_pos[2]
-        
         
         current_state_history.append(start_state)
         counter += 1
